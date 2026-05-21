@@ -76,15 +76,14 @@ export async function GET(request: NextRequest) {
     // Sorting
     const orderBy =
       sort === "price_asc"
-        ? { price: "asc" }
+        ? { price: "asc" as const }
         : sort === "price_desc"
-          ? { price: "desc" }
+          ? { price: "desc" as const }
           : sort === "rating"
-            ? { rating: "desc" }
+            ? { rating: "desc" as const }
             : sort === "popular"
-              ? { reviewCount: "desc" }
-              : { createdAt: "desc" };
-
+              ? { reviewCount: "desc" as const }
+              : { createdAt: "desc" as const };
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,

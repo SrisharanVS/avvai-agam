@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* ─── Avvai Brand Colors ─────────────────────────── */
+  --color-primary-50: #f0f7e8;
+  --color-primary-100: #d9edca;
+  --color-primary-200: #b8d4a0;
+  --color-primary-300: #8fb872;
+  --color-primary-400: #6b9e4a;
+  --color-primary-500: #4a7c2f;
+  --color-primary-600: #2d5016;
+  --color-primary-700: #1e3a0f;
+  --color-primary-800: #142808;
+  --color-primary-900: #0a1604;
+
+  --color-olive-50: #f3f5ea;
+  --color-olive-100: #e1e6c8;
+  --color-olive-200: #c3cc96;
+  --color-olive-300: #a5b264;
+  --color-olive-400: #8a9842;
+  --color-olive-500: #6b7c3a;
+  --color-olive-600: #4f5c2a;
+  --color-olive-700: #363f1c;
+  --color-olive-800: #1e220f;
+
+  --color-earth-50: #fdf5ef;
+  --color-earth-100: #f8e4d0;
+  --color-earth-200: #f0c9a0;
+  --color-earth-300: #e6a96e;
+  --color-earth-400: #d4894a;
+  --color-earth-500: #b86f38;
+  --color-earth-600: #8b5e3c;
+  --color-earth-700: #6b4a2f;
+  --color-earth-800: #4a3320;
+
+  --color-cream-50: #fefdfb;
+  --color-cream-100: #fafaf7;
+  --color-cream-200: #f5f0e8;
+  --color-cream-300: #ede5d4;
+  --color-cream-400: #e0d5c0;
+  --color-cream-500: #cfc0a0;
+
+  --color-amber-400: #d4a853;
+  --color-amber-500: #c49340;
+  --color-amber-600: #a87a2e;
+
+  /* ─── Semantic aliases ───────────────────────────── */
+  --color-background: var(--color-cream-100);
+  --color-foreground: #1a2209;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a2209;
+  --color-border: var(--color-cream-400);
+  --color-input: var(--color-cream-300);
+  --color-ring: var(--color-primary-500);
+  --color-muted: var(--color-cream-300);
+  --color-muted-foreground: #6b7280;
+
+  /* ─── Typography ─────────────────────────────────── */
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-display: var(--font-playfair), "Playfair Display", Georgia, serif;
+
+  /* ─── Border radius ──────────────────────────────── */
+  --radius: 0.75rem;
+  --radius-sm: 0.5rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  /* ─── Shadows ────────────────────────────────────── */
+  --shadow-organic: 0 4px 24px rgba(45, 80, 22, 0.12);
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 8px 32px rgba(45, 80, 22, 0.16);
+}
+
+/* ─── Base Styles ─────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-cream-100);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Typography Utilities ────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+}
+
+/* ─── Custom Scrollbar ────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-cream-200);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary-300);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-500);
+}
+
+/* ─── Glass Effect ────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ─── Organic Gradient ────────────────────────────────────── */
+.gradient-organic {
+  background: linear-gradient(135deg, #2d5016 0%, #4a7c2f 50%, #6b7c3a 100%);
+}
+
+.gradient-warm {
+  background: linear-gradient(135deg, #f5f0e8 0%, #ede5d4 100%);
+}
+
+/* ─── Text Gradient ───────────────────────────────────────── */
+.text-gradient {
+  background: linear-gradient(135deg, #2d5016, #6b9e4a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Card Hover ──────────────────────────────────────────── */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* ─── Leaf decoration ─────────────────────────────────────── */
+.leaf-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--color-primary-400);
+}
+.leaf-divider::before,
+.leaf-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--color-primary-300),
+    transparent
+  );
+}
+
+/* ─── Section Padding ─────────────────────────────────────── */
+.section-padding {
+  padding: 5rem 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .section-padding {
+    padding: 6rem 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .section-padding {
+    padding: 7rem 2rem;
+  }
+}
+
+/* ─── Line clamp utilities ────────────────────────────────── */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

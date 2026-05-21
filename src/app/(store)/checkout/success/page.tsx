@@ -7,7 +7,9 @@ import { CheckCircle, Package, ArrowRight, Leaf, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 
-export default function CheckoutSuccessPage() {
+import { Suspense } from "react";
+
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get("orderNumber");
   const orderId = searchParams.get("orderId");
@@ -93,5 +95,19 @@ export default function CheckoutSuccessPage() {
         </p>
       </motion.div>
     </div>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen pt-20 bg-cream-100 flex items-center justify-center px-4">
+        <div className="max-w-lg w-full text-center bg-white rounded-3xl shadow-card p-8">
+          <p className="text-gray-600 animate-pulse">Loading order details...</p>
+        </div>
+      </div>
+    }>
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }

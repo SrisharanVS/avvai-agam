@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Search, SlidersHorizontal, X } from "lucide-react";
@@ -20,7 +20,7 @@ const SORT_OPTIONS = [
   { value: "popular", label: "Most Popular" },
 ];
 
-export default function ShopPage() {
+function ShopContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -248,5 +248,17 @@ export default function ShopPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-cream-100 pt-20 flex items-center justify-center">
+        <div className="text-center text-gray-500 animate-pulse font-display text-lg">Loading shop...</div>
+      </div>
+    }>
+      <ShopContent />
+    </Suspense>
   );
 }

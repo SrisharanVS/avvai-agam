@@ -150,9 +150,8 @@ export default function ProductDetailPage() {
                   <button
                     key={i}
                     onClick={() => setSelectedImage(i)}
-                    className={`relative w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                      i === selectedImage ? "border-primary-600" : "border-transparent"
-                    }`}
+                    className={`relative w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${i === selectedImage ? "border-primary-600" : "border-transparent"
+                      }`}
                   >
                     <Image src={url} alt="" fill className="object-cover" />
                   </button>
@@ -245,20 +244,6 @@ export default function ProductDetailPage() {
                 <ShoppingCart className="w-4 h-4 mr-2" />
                 Add to Cart
               </Button>
-            </div>
-
-            {/* Trust */}
-            <div className="grid grid-cols-3 gap-3 pt-2">
-              {[
-                { icon: Shield, text: "100% Organic" },
-                { icon: Truck, text: "Free Shipping ₹500+" },
-                { icon: RefreshCw, text: "Easy Returns" },
-              ].map(({ icon: Icon, text }) => (
-                <div key={text} className="flex flex-col items-center gap-1.5 bg-cream-100 rounded-xl p-3 text-center">
-                  <Icon className="w-5 h-5 text-primary-500" />
-                  <span className="text-xs text-gray-600 font-medium">{text}</span>
-                </div>
-              ))}
             </div>
 
             {/* Tags */}

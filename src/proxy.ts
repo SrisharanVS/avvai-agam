@@ -8,13 +8,22 @@ export async function proxy(request: NextRequest) {
 
   // Protect admin dashboard routes
   const isAdminDashboard = pathname.startsWith("/admin/dashboard");
+
+  // Publicly accessible paths under matched API routes
+  const isPublicApi =
+    (request.method === "POST" && pathname === "/api/orders") ||
+    (request.method === "GET" &&
+      pathname.startsWith("/api/invoices/by-order/") &&
+      pathname.endsWith("/download"));
+
   // Protect admin API routes
   const isAdminApi =
     pathname.startsWith("/api/") &&
     !pathname.startsWith("/api/auth") &&
     !pathname.startsWith("/api/products") &&
     !pathname.startsWith("/api/categories") &&
-    !pathname.startsWith("/api/newsletter");
+    !pathname.startsWith("/api/newsletter") &&
+    !isPublicApi;
 
   if (isAdminDashboard || isAdminApi) {
     const token = request.cookies.get(ADMIN_COOKIE)?.value;

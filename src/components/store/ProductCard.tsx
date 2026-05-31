@@ -20,8 +20,8 @@ export default function ProductCard({ product }: ProductCardProps) {
   const discountPercent =
     product.discountedPrice && product.price > 0
       ? Math.round(
-          ((product.price - product.discountedPrice) / product.price) * 100
-        )
+        ((product.price - product.discountedPrice) / product.price) * 100
+      )
       : null;
 
   const handleAddToCart = () => {
@@ -90,7 +90,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="p-4 flex flex-col flex-1">
         <div className="mb-1">
           <p className="text-xs text-olive-500 font-medium uppercase tracking-wide">
-            {product.category.name}
+            {product.category?.name}
           </p>
         </div>
 

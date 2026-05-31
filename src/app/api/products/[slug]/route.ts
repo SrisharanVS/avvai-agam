@@ -42,6 +42,7 @@ export async function GET(
           ...r,
           price: Number(r.price),
           discountedPrice: r.discountedPrice ? Number(r.discountedPrice) : null,
+          rating: Number(r.rating),
         })),
       },
     });

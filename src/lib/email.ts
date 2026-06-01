@@ -181,3 +181,79 @@ export async function sendOrderConfirmationEmail({
     html: emailHtml,
   });
 }
+
+export async function sendPurchaseOrderEmail({
+  to,
+  supplierName,
+  poNumber,
+  totalAmount,
+  pdfBuffer,
+}: {
+  to: string;
+  supplierName: string;
+  poNumber: string;
+  totalAmount: number;
+  pdfBuffer?: Buffer;
+}) {
+  const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Purchase Order from Avvai</title>
+</head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Arial,sans-serif;background:#F5F0E8;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F0E8;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#2D5016,#4A7C2F);padding:40px;text-align:center;">
+            <h1 style="color:#F5F0E8;margin:0;font-size:32px;font-weight:700;">🌿 Avvai</h1>
+            <p style="color:#B8D4A0;margin:8px 0 0;font-size:14px;letter-spacing:2px;text-transform:uppercase;">Purchase Order</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px;">
+            <p style="color:#4A5568;font-size:16px;margin:0 0 16px;">Dear <strong style="color:#2D5016;">${supplierName}</strong>,</p>
+            <p style="color:#4A5568;font-size:15px;line-height:1.6;margin:0 0 24px;">
+              Please find attached our Purchase Order. Kindly review and confirm receipt.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F0E8;border-radius:12px;padding:24px;margin-bottom:24px;">
+              <tr>
+                <td>
+                  <p style="margin:0 0 8px;color:#718096;font-size:13px;text-transform:uppercase;letter-spacing:1px;">Purchase Order Number</p>
+                  <p style="margin:0 0 16px;color:#2D5016;font-size:20px;font-weight:700;">${poNumber}</p>
+                  <p style="margin:0 0 8px;color:#718096;font-size:13px;text-transform:uppercase;letter-spacing:1px;">Total Amount</p>
+                  <p style="margin:0;color:#2D5016;font-size:28px;font-weight:700;">₹${totalAmount.toFixed(2)}</p>
+                </td>
+              </tr>
+            </table>
+            <p style="color:#718096;font-size:14px;line-height:1.6;">
+              For any queries, contact us at <a href="mailto:support@avvai.in" style="color:#2D5016;font-weight:600;">support@avvai.in</a>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#2D5016;padding:24px;text-align:center;">
+            <p style="color:#B8D4A0;margin:0;font-size:13px;">© 2024 Avvai Natural Foods. All rights reserved.</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const attachments = pdfBuffer
+    ? [{ filename: `${poNumber}.pdf`, content: pdfBuffer, contentType: "application/pdf" }]
+    : [];
+
+  return await transporter.sendMail({
+    from: FROM_EMAIL,
+    to,
+    subject: `Purchase Order ${poNumber} from Avvai Natural Foods`,
+    html: emailHtml,
+    attachments,
+  });
+}
+

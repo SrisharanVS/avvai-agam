@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ShoppingCart, Package, TrendingUp, AlertTriangle,
-  Clock, CheckCircle, Truck, XCircle,
+  Clock, CheckCircle, Truck, XCircle, ClipboardList,
+  Boxes, ChevronRight, Building2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DashboardStats, OrderSummary } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   PENDING: { label: "Pending", color: "bg-yellow-100 text-yellow-700", icon: Clock },
@@ -40,6 +42,7 @@ export default function AdminDashboardPage() {
           icon: ShoppingCart,
           color: "text-blue-600",
           bg: "bg-blue-50",
+          href: "/admin/dashboard/orders",
         },
         {
           title: "Revenue (Paid)",
@@ -47,6 +50,7 @@ export default function AdminDashboardPage() {
           icon: TrendingUp,
           color: "text-green-600",
           bg: "bg-green-50",
+          href: "/admin/dashboard/orders",
         },
         {
           title: "Total Products",
@@ -54,13 +58,31 @@ export default function AdminDashboardPage() {
           icon: Package,
           color: "text-purple-600",
           bg: "bg-purple-50",
+          href: "/admin/dashboard/products",
         },
         {
           title: "Low Stock Alerts",
-          value: stats.lowStockCount.toLocaleString(),
+          value: (stats.lowStockCount ?? 0).toLocaleString(),
           icon: AlertTriangle,
-          color: stats.lowStockCount > 0 ? "text-red-600" : "text-gray-400",
-          bg: stats.lowStockCount > 0 ? "bg-red-50" : "bg-gray-50",
+          color: (stats.lowStockCount ?? 0) > 0 ? "text-red-600" : "text-gray-400",
+          bg: (stats.lowStockCount ?? 0) > 0 ? "bg-red-50" : "bg-gray-50",
+          href: "/admin/dashboard/inventory",
+        },
+        {
+          title: "Pending POs",
+          value: (stats.pendingPOCount ?? 0).toLocaleString(),
+          icon: ClipboardList,
+          color: (stats.pendingPOCount ?? 0) > 0 ? "text-amber-600" : "text-gray-400",
+          bg: (stats.pendingPOCount ?? 0) > 0 ? "bg-amber-50" : "bg-gray-50",
+          href: "/admin/dashboard/purchase-orders",
+        },
+        {
+          title: "Inventory Value",
+          value: `₹${(stats.inventoryValue ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 0 })}`,
+          icon: Boxes,
+          color: "text-teal-600",
+          bg: "bg-teal-50",
+          href: "/admin/dashboard/reports",
         },
       ]
     : [];
@@ -73,39 +95,127 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => (
+          ? Array.from({ length: 6 }).map((_, i) => (
               <Skeleton key={i} className="h-28 rounded-2xl" />
             ))
-          : statCards.map(({ title, value, icon: Icon, color, bg }, i) => (
+          : statCards.map(({ title, value, icon: Icon, color, bg, href }, i) => (
               <motion.div
                 key={title}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
+                transition={{ delay: i * 0.08 }}
               >
-                <Card className="rounded-2xl border-0 shadow-card">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">{title}</p>
-                        <p className="text-2xl font-bold text-gray-800">{value}</p>
+                <Link href={href}>
+                  <Card className="rounded-2xl border-0 shadow-card hover:shadow-md transition-shadow cursor-pointer">
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1 leading-tight">{title}</p>
+                          <p className="text-xl font-bold text-gray-800">{value}</p>
+                        </div>
+                        <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                          <Icon className={`w-4.5 h-4.5 ${color}`} />
+                        </div>
                       </div>
-                      <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center`}>
-                        <Icon className={`w-5 h-5 ${color}`} />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               </motion.div>
             ))}
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Low Stock Alerts */}
+        <Card className="rounded-2xl border-0 shadow-card">
+          <CardHeader className="border-b border-gray-50 pb-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              Low Stock Alerts
+            </CardTitle>
+            <Link href="/admin/dashboard/inventory" className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-5 space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
+              </div>
+            ) : !stats?.lowStockProducts || stats.lowStockProducts.length === 0 ? (
+              <div className="p-8 text-center">
+                <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-400" />
+                <p className="text-sm text-gray-500">All products are well stocked!</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {stats.lowStockProducts.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">Min: {p.minimumStockLevel}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-red-600">{p.stock}</span>
+                      <Badge className="bg-red-50 text-red-600 text-xs">Low</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Purchase Orders */}
+        <Card className="rounded-2xl border-0 shadow-card">
+          <CardHeader className="border-b border-gray-50 pb-4 flex flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-amber-500" />
+              Pending Purchase Orders
+            </CardTitle>
+            <Link href="/admin/dashboard/purchase-orders" className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+              View all <ChevronRight className="w-3 h-3" />
+            </Link>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-5 space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
+              </div>
+            ) : (stats?.pendingPOCount ?? 0) === 0 ? (
+              <div className="p-8 text-center">
+                <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-400" />
+                <p className="text-sm text-gray-500">No pending purchase orders</p>
+              </div>
+            ) : (
+              <div className="p-5">
+                <div className="flex items-center gap-3 bg-amber-50 rounded-xl p-4">
+                  <ClipboardList className="w-8 h-8 text-amber-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-2xl font-bold text-amber-700">{stats?.pendingPOCount}</p>
+                    <p className="text-sm text-amber-600">orders awaiting action</p>
+                  </div>
+                </div>
+                <Link
+                  href="/admin/dashboard/purchase-orders"
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white text-sm font-medium rounded-xl hover:bg-primary-700 transition-colors"
+                >
+                  Manage Purchase Orders
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Recent Orders */}
       <Card className="rounded-2xl border-0 shadow-card">
-        <CardHeader className="border-b border-gray-50 pb-4">
+        <CardHeader className="border-b border-gray-50 pb-4 flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-semibold text-gray-800">Recent Orders</CardTitle>
+          <Link href="/admin/dashboard/orders" className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+            View all <ChevronRight className="w-3 h-3" />
+          </Link>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (

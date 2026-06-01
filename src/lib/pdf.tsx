@@ -366,3 +366,251 @@ export async function generateInvoicePDFBuffer(invoice: PDFInvoiceData): Promise
   const doc = React.createElement(InvoicePDF, { invoice });
   return await renderToBuffer(doc as any);
 }
+
+// ─── Purchase Order PDF ────────────────────────────────────────────────────────
+
+interface PDFPOItem {
+  productName: string;
+  quantity: number;
+  unit: string;
+  costPrice: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+}
+
+interface PDFPurchaseOrderData {
+  poNumber: string;
+  status: string;
+  expectedDeliveryDate?: Date | string | null;
+  notes?: string | null;
+  supplier: {
+    name: string;
+    contactPerson?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    gstNumber?: string | null;
+  };
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  createdAt: Date | string;
+  items: PDFPOItem[];
+}
+
+const poStyles = StyleSheet.create({
+  poTitle: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 18,
+    color: "#2D5016",
+    marginBottom: 4,
+  },
+  poSubtitle: {
+    fontSize: 8,
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  statusBadge: {
+    fontSize: 8,
+    color: "#4A7C2F",
+    backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+  },
+  colProduct: { width: "35%" },
+  colQty: { width: "10%", textAlign: "center" },
+  colUnit: { width: "10%", textAlign: "center" },
+  colCost: { width: "15%", textAlign: "right" },
+  colTax: { width: "12%", textAlign: "center" },
+  colTotal: { width: "18%", textAlign: "right" },
+});
+
+export function PurchaseOrderPDF({ po }: { po: PDFPurchaseOrderData }) {
+  const formattedDate = new Date(po.createdAt).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const deliveryDate = po.expectedDeliveryDate
+    ? new Date(po.expectedDeliveryDate).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "TBD";
+
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.brandName}>Avvai</Text>
+            <Text style={styles.brandTagline}>Pure Food. Naturally Yours.</Text>
+          </View>
+          <View style={styles.companyDetails}>
+            <Text style={{ fontFamily: "Helvetica-Bold", color: "#1E293B" }}>Avvai Natural Foods</Text>
+            <Text>12, Farm Direct Lane, Organic Hub</Text>
+            <Text>Chennai, Tamil Nadu, 600001</Text>
+            <Text>Email: support@avvai.in | Web: www.avvai.in</Text>
+            <Text>GSTIN: 33AAAAA1111A1Z1 (Placeholder)</Text>
+          </View>
+        </View>
+
+        {/* PO Title */}
+        <View style={{ marginBottom: 20 }}>
+          <Text style={poStyles.poTitle}>PURCHASE ORDER</Text>
+          <Text style={poStyles.poSubtitle}>{po.poNumber}</Text>
+          <Text style={poStyles.statusBadge}>{po.status.replace(/_/g, " ")}</Text>
+        </View>
+
+        {/* Meta */}
+        <View style={styles.invoiceMetaContainer}>
+          <View style={styles.metaCol}>
+            <Text style={styles.metaTitle}>Supplier</Text>
+            <Text style={[styles.metaText, { fontFamily: "Helvetica-Bold", color: "#1E293B" }]}>
+              {po.supplier.name}
+            </Text>
+            {po.supplier.contactPerson && (
+              <Text style={styles.metaText}>Attn: {po.supplier.contactPerson}</Text>
+            )}
+            {po.supplier.email && <Text style={styles.metaText}>{po.supplier.email}</Text>}
+            {po.supplier.phone && <Text style={styles.metaText}>{po.supplier.phone}</Text>}
+            {po.supplier.address && (
+              <Text style={[styles.metaText, { marginTop: 4 }]}>{po.supplier.address}</Text>
+            )}
+            {po.supplier.gstNumber && (
+              <Text style={styles.metaText}>GST: {po.supplier.gstNumber}</Text>
+            )}
+          </View>
+          <View style={[styles.metaCol, { textAlign: "right" }]}>
+            <Text style={styles.metaTitle}>PO Details</Text>
+            <Text style={styles.metaText}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>PO #: </Text>
+              {po.poNumber}
+            </Text>
+            <Text style={styles.metaText}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>Date: </Text>
+              {formattedDate}
+            </Text>
+            <Text style={styles.metaText}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>Expected Delivery: </Text>
+              {deliveryDate}
+            </Text>
+          </View>
+        </View>
+
+        {/* Items Table */}
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <View style={poStyles.colProduct}>
+              <Text style={styles.tableHeaderText}>Product</Text>
+            </View>
+            <View style={poStyles.colQty}>
+              <Text style={styles.tableHeaderText}>Qty</Text>
+            </View>
+            <View style={poStyles.colUnit}>
+              <Text style={styles.tableHeaderText}>Unit</Text>
+            </View>
+            <View style={poStyles.colCost}>
+              <Text style={[styles.tableHeaderText, { textAlign: "right" }]}>Cost Price</Text>
+            </View>
+            <View style={poStyles.colTax}>
+              <Text style={styles.tableHeaderText}>Tax %</Text>
+            </View>
+            <View style={poStyles.colTotal}>
+              <Text style={[styles.tableHeaderText, { textAlign: "right" }]}>Total</Text>
+            </View>
+          </View>
+
+          {po.items.map((item, idx) => (
+            <View key={idx} style={styles.tableRow}>
+              <View style={poStyles.colProduct}>
+                <Text style={[styles.tableCellText, { fontFamily: "Helvetica-Bold" }]}>
+                  {item.productName}
+                </Text>
+              </View>
+              <View style={poStyles.colQty}>
+                <Text style={styles.tableCellText}>{item.quantity}</Text>
+              </View>
+              <View style={poStyles.colUnit}>
+                <Text style={styles.tableCellText}>{item.unit}</Text>
+              </View>
+              <View style={poStyles.colCost}>
+                <Text style={[styles.tableCellText, { textAlign: "right" }]}>
+                  Rs. {item.costPrice.toFixed(2)}
+                </Text>
+              </View>
+              <View style={poStyles.colTax}>
+                <Text style={styles.tableCellText}>{item.taxRate}%</Text>
+              </View>
+              <View style={poStyles.colTotal}>
+                <Text style={[styles.tableCellText, { textAlign: "right", fontFamily: "Helvetica-Bold" }]}>
+                  Rs. {item.total.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Totals */}
+        <View style={styles.totalsContainer}>
+          <View style={styles.totalsTable}>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Subtotal:</Text>
+              <Text style={styles.totalsVal}>Rs. {po.subtotal.toFixed(2)}</Text>
+            </View>
+            {po.taxAmount > 0 && (
+              <View style={styles.totalsRow}>
+                <Text style={styles.totalsLabel}>GST/Tax:</Text>
+                <Text style={styles.totalsVal}>Rs. {po.taxAmount.toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalLabel}>Grand Total:</Text>
+              <Text style={styles.grandTotalVal}>Rs. {po.totalAmount.toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Notes */}
+        {po.notes && (
+          <View style={styles.notesContainer}>
+            <Text style={styles.notesTitle}>Notes / Terms</Text>
+            <Text style={styles.notesText}>{po.notes}</Text>
+          </View>
+        )}
+
+        {/* Signature area */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 40 }}>
+          <View style={{ width: "45%" }}>
+            <View style={{ borderTopWidth: 1, borderTopColor: "#CBD5E1", paddingTop: 6 }}>
+              <Text style={{ fontSize: 8, color: "#64748B" }}>Authorised Signatory — Avvai Natural Foods</Text>
+            </View>
+          </View>
+          <View style={{ width: "45%" }}>
+            <View style={{ borderTopWidth: 1, borderTopColor: "#CBD5E1", paddingTop: 6 }}>
+              <Text style={{ fontSize: 8, color: "#64748B" }}>Acknowledged by — {po.supplier.name}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Avvai Natural Foods — Pure Food. Naturally Yours.</Text>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+export async function generatePurchaseOrderPDFBuffer(po: PDFPurchaseOrderData): Promise<Buffer> {
+  const doc = React.createElement(PurchaseOrderPDF, { po });
+  return await renderToBuffer(doc as any);
+}
+

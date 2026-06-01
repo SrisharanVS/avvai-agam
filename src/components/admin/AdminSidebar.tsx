@@ -6,17 +6,42 @@ import { useState } from "react";
 import {
   LayoutDashboard, Package, ShoppingCart, FolderOpen, FileText,
   Users, Mail, LogOut, Leaf, Menu, X, ChevronRight,
+  Building2, ClipboardList, Boxes, BarChart2,
 } from "lucide-react";
 import { toast } from "sonner";
 
-const navItems = [
-  { href: "/admin/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin/dashboard/products", label: "Products", icon: Package },
-  { href: "/admin/dashboard/orders", label: "Orders", icon: ShoppingCart },
-  { href: "/admin/dashboard/categories", label: "Categories", icon: FolderOpen },
-  { href: "/admin/dashboard/invoices", label: "Invoices", icon: FileText },
-  { href: "/admin/dashboard/customers", label: "Customers", icon: Users },
-  { href: "/admin/dashboard/newsletter", label: "Newsletter", icon: Mail },
+const navSections = [
+  {
+    title: "Overview",
+    items: [
+      { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: "Store",
+    items: [
+      { href: "/admin/dashboard/products", label: "Products", icon: Package },
+      { href: "/admin/dashboard/orders", label: "Orders", icon: ShoppingCart },
+      { href: "/admin/dashboard/categories", label: "Categories", icon: FolderOpen },
+      { href: "/admin/dashboard/invoices", label: "Invoices", icon: FileText },
+      { href: "/admin/dashboard/customers", label: "Customers", icon: Users },
+      { href: "/admin/dashboard/newsletter", label: "Newsletter", icon: Mail },
+    ],
+  },
+  {
+    title: "Procurement",
+    items: [
+      { href: "/admin/dashboard/suppliers", label: "Suppliers", icon: Building2 },
+      { href: "/admin/dashboard/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
+    ],
+  },
+  {
+    title: "Inventory",
+    items: [
+      { href: "/admin/dashboard/inventory", label: "Stock Ledger", icon: Boxes },
+      { href: "/admin/dashboard/reports", label: "Reports", icon: BarChart2 },
+    ],
+  },
 ];
 
 export default function AdminSidebar() {
@@ -46,26 +71,35 @@ export default function AdminSidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== "/admin/dashboard" && pathname.startsWith(href));
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
-                active
-                  ? "bg-primary-600 text-cream-100 shadow-sm"
-                  : "text-gray-600 hover:bg-cream-100 hover:text-primary-700"
-              }`}
-            >
-              <Icon className="w-4.5 h-4.5 flex-shrink-0" />
-              <span className="flex-1">{label}</span>
-              {active && <ChevronRight className="w-4 h-4 opacity-60" />}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+        {navSections.map((section) => (
+          <div key={section.title}>
+            <p className="px-3 mb-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+              {section.title}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map(({ href, label, icon: Icon }) => {
+                const active = pathname === href || (href !== "/admin/dashboard" && pathname.startsWith(href));
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setMobileOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group ${
+                      active
+                        ? "bg-primary-600 text-cream-100 shadow-sm"
+                        : "text-gray-600 hover:bg-cream-100 hover:text-primary-700"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    {active && <ChevronRight className="w-4 h-4 opacity-60" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Logout */}

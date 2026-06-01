@@ -47,6 +47,12 @@ export async function GET(request: NextRequest) {
           },
         },
         {
+          sku: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+        {
           description: {
             contains: search,
             mode: "insensitive",
@@ -160,6 +166,10 @@ export async function POST(request: NextRequest) {
       benefits,
       weight,
       tags,
+      sku,
+      unit,
+      defaultTaxRate,
+      active,
     } = body;
 
     // Validation
@@ -173,6 +183,24 @@ export async function POST(request: NextRequest) {
           status: 400,
         }
       );
+    }
+
+    // Sequence Generator for sku (PROD-XXXXXX)
+    let finalSku = sku;
+    if (!finalSku) {
+      const latestProduct = await prisma.product.findFirst({
+        orderBy: { sku: "desc" },
+        where: { sku: { startsWith: "PROD-" } }
+      });
+      let nextNum = 1;
+      if (latestProduct && latestProduct.sku) {
+        const parts = latestProduct.sku.split("-");
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num)) {
+          nextNum = num + 1;
+        }
+      }
+      finalSku = `PROD-${String(nextNum).padStart(6, "0")}`;
     }
 
     const generatedSlug =
@@ -198,6 +226,10 @@ export async function POST(request: NextRequest) {
         benefits,
         weight,
         tags: tags || [],
+        sku: finalSku,
+        unit: unit || "units",
+        defaultTaxRate: defaultTaxRate || 0,
+        active: active !== undefined ? active : true,
       },
 
       include: {

@@ -205,6 +205,16 @@ export interface DashboardStats {
   totalProducts: number;
   lowStockCount: number;
   recentOrders: OrderSummary[];
+  pendingPOCount?: number;
+  inventoryValue?: number;
+  lowStockProducts?: LowStockProduct[];
+}
+
+export interface LowStockProduct {
+  id: string;
+  name: string;
+  stock: number;
+  minimumStockLevel: number;
 }
 
 // ─── Status Enums ────────────────────────────────────────────────────────────
@@ -218,3 +228,111 @@ export type OrderStatus =
   | "CANCELLED";
 export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "REFUNDED";
 export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "CANCELLED";
+export type PurchaseOrderStatus =
+  | "DRAFT"
+  | "SENT"
+  | "PARTIALLY_RECEIVED"
+  | "RECEIVED"
+  | "CANCELLED";
+export type MovementType =
+  | "PURCHASE"
+  | "SALE"
+  | "ADJUSTMENT"
+  | "RETURN"
+  | "DAMAGED";
+
+// ─── Supplier Types ───────────────────────────────────────────────────────────
+
+export interface SupplierType {
+  id: string;
+  name: string;
+  contactPerson: string | null;
+  email: string | null;
+  phone: string | null;
+  gstNumber: string | null;
+  address: string | null;
+  notes: string | null;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { purchaseOrders: number };
+}
+
+export interface SupplierDetail extends SupplierType {
+  purchaseOrders: PurchaseOrderSummary[];
+  totalSpend: number;
+  totalOrders: number;
+}
+
+// ─── Purchase Order Types ─────────────────────────────────────────────────────
+
+export interface PurchaseOrderItemType {
+  id: string;
+  productId: string | null;
+  productName: string;
+  quantity: number;
+  receivedQuantity: number;
+  unit: string;
+  costPrice: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+}
+
+export interface PurchaseOrderSummary {
+  id: string;
+  poNumber: string;
+  supplierId: string;
+  supplier: { id: string; name: string; email: string | null };
+  status: PurchaseOrderStatus;
+  expectedDeliveryDate: string | null;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { items: number };
+}
+
+export interface PurchaseOrderDetail extends PurchaseOrderSummary {
+  notes: string | null;
+  items: PurchaseOrderItemType[];
+}
+
+export interface CreatePurchaseOrderData {
+  supplierId: string;
+  expectedDeliveryDate?: string;
+  notes?: string;
+  items: {
+    productId?: string;
+    productName: string;
+    quantity: number;
+    unit?: string;
+    costPrice: number;
+    taxRate?: number;
+  }[];
+}
+
+export interface ReceiveInventoryData {
+  items: {
+    itemId: string;
+    receivedQuantity: number;
+  }[];
+  notes?: string;
+}
+
+// ─── Inventory Movement Types ─────────────────────────────────────────────────
+
+export interface InventoryMovementType {
+  id: string;
+  productId: string;
+  product: { id: string; name: string; slug: string };
+  movementType: MovementType;
+  quantity: number;
+  previousStock: number;
+  newStock: number;
+  referenceType: string | null;
+  referenceId: string | null;
+  notes: string | null;
+  createdAt: string;
+}

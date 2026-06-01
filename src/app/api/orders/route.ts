@@ -138,12 +138,29 @@ export async function POST(request: NextRequest) {
         include: { items: true },
       });
 
-      // Reduce stock
+      // Reduce stock and record inventory movements
       for (const item of items) {
         if (item.productId) {
+          const product = products.find((p) => p.id === item.productId);
+          const previousStock = product?.stock ?? 0;
+          const newStock = Math.max(0, previousStock - item.quantity);
+
           await tx.product.update({
             where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
+            data: { stock: newStock },
+          });
+
+          await tx.inventoryMovement.create({
+            data: {
+              productId: item.productId,
+              movementType: "SALE",
+              quantity: -item.quantity,
+              previousStock,
+              newStock,
+              referenceType: "ORDER",
+              referenceId: newOrder.id,
+              notes: `Sale — Order ${orderNumber}`,
+            },
           });
         }
       }

@@ -57,6 +57,11 @@
   --color-muted: var(--color-cream-300);
   --color-muted-foreground: #6b7280;
 
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a2209;
+  --color-accent: var(--color-cream-200);
+  --color-accent-foreground: #1a2209;
+
   /* ─── Typography ─────────────────────────────────── */
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
   --font-display: var(--font-playfair), "Playfair Display", Georgia, serif;

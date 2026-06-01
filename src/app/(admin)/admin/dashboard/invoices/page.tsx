@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { motion } from "framer-motion";
-import { Plus, Trash2, Send, Download, Eye, FileText, RefreshCw } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Trash2, Send, Download, FileText, AlertCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,18 +12,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { InvoiceSummary, InvoiceDetail } from "@/types";
+import { InvoiceSummary } from "@/types";
+import { CustomerCombobox } from "@/components/admin/CustomerCombobox";
+import { ProductCombobox } from "@/components/admin/ProductCombobox";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface InvoiceLineItem {
+  productId: string | null;
   productName: string;
   description: string;
   quantity: number;
   unitPrice: number;
   taxRate: number;
+  originalPrice?: number;
+  originalTaxRate?: number;
 }
 
 const emptyItem = (): InvoiceLineItem => ({
-  productName: "", description: "", quantity: 1, unitPrice: 0, taxRate: 0,
+  productId: null, productName: "", description: "", quantity: 1, unitPrice: 0, taxRate: 0,
 });
 
 export default function AdminInvoicesPage() {
@@ -31,11 +37,24 @@ export default function AdminInvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("create");
 
-  // Invoice builder state
+  // Customer resolution & details state
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  
+  // For comparing changes
+  const [originalCustomer, setOriginalCustomer] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    gstNumber: string;
+  } | null>(null);
+  const [updateCustomerProfile, setUpdateCustomerProfile] = useState(true);
+
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [shippingAmount, setShippingAmount] = useState(0);
@@ -46,21 +65,91 @@ export default function AdminInvoicesPage() {
 
   const fetchInvoices = async () => {
     setLoading(true);
-    const res = await fetch("/api/invoices?type=MANUAL");
-    const data = await res.json();
-    if (data.success) setInvoices(data.data);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/invoices?type=MANUAL");
+      const data = await res.json();
+      if (data.success) setInvoices(data.data);
+    } catch {
+      toast.error("Failed to load invoice history");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchInvoices(); }, []);
+  useEffect(() => { 
+    fetchInvoices(); 
+  }, []);
 
   const addItem = () => setItems((prev) => [...prev, emptyItem()]);
   const removeItem = (i: number) => setItems((prev) => prev.filter((_, j) => j !== i));
-  const updateItem = (index: number, field: keyof InvoiceLineItem, value: string | number) => {
+  const updateItem = (index: number, field: keyof InvoiceLineItem, value: any) => {
     setItems((prev) =>
       prev.map((item, i) =>
         i === index ? { ...item, [field]: value } : item
       )
+    );
+  };
+
+  // When a Customer is selected
+  const handleSelectCustomer = (customer: any) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerName(customer.name);
+    setCustomerEmail(customer.email || "");
+    setCustomerPhone(customer.phone || "");
+    setBillingAddress(customer.address || "");
+    setGstNumber(customer.gstNumber || "");
+    setOriginalCustomer({
+      name: customer.name,
+      email: customer.email || "",
+      phone: customer.phone || "",
+      address: customer.address || "",
+      gstNumber: customer.gstNumber || "",
+    });
+    setUpdateCustomerProfile(true);
+  };
+
+  // Inline customer typed
+  const handleCreateCustomerInline = (name: string) => {
+    setSelectedCustomerId(null);
+    setCustomerName(name);
+    setCustomerEmail("");
+    setCustomerPhone("");
+    setBillingAddress("");
+    setGstNumber("");
+    setOriginalCustomer(null);
+  };
+
+  // When a product is selected in a row
+  const handleSelectProduct = (index: number, product: any) => {
+    updateItem(index, "productId", product.id);
+    updateItem(index, "productName", product.name);
+    updateItem(index, "unitPrice", Number(product.price));
+    updateItem(index, "taxRate", Number(product.defaultTaxRate || 0));
+    updateItem(index, "originalPrice", Number(product.price));
+    updateItem(index, "originalTaxRate", Number(product.defaultTaxRate || 0));
+    if (product.description) {
+      updateItem(index, "description", product.description);
+    }
+  };
+
+  const handleCreateProductInline = (index: number, name: string) => {
+    updateItem(index, "productId", null);
+    updateItem(index, "productName", name);
+    updateItem(index, "unitPrice", 0);
+    updateItem(index, "taxRate", 0);
+    updateItem(index, "originalPrice", undefined);
+    updateItem(index, "originalTaxRate", undefined);
+  };
+
+  // Check if customer profile info differs
+  const isProfileDifferent = () => {
+    if (!originalCustomer) return false;
+    return (
+      customerName.trim() !== originalCustomer.name ||
+      customerEmail.trim().toLowerCase() !== originalCustomer.email.toLowerCase() ||
+      customerPhone.trim() !== originalCustomer.phone ||
+      billingAddress.trim() !== originalCustomer.address ||
+      gstNumber.trim() !== originalCustomer.gstNumber
     );
   };
 
@@ -91,8 +180,25 @@ export default function AdminInvoicesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerName, customerEmail, customerPhone, billingAddress,
-          paymentMethod, discountAmount, shippingAmount, notes, items,
+          customerId: selectedCustomerId,
+          customerName,
+          customerEmail,
+          customerPhone,
+          billingAddress,
+          gstNumber,
+          updateCustomerProfile: isProfileDifferent() ? updateCustomerProfile : false,
+          paymentMethod,
+          discountAmount,
+          shippingAmount,
+          notes,
+          items: items.map((i) => ({
+            productId: i.productId,
+            productName: i.productName,
+            description: i.description || null,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            taxRate: i.taxRate
+          })),
         }),
       });
       const data = await res.json();
@@ -100,9 +206,11 @@ export default function AdminInvoicesPage() {
       if (data.success) {
         toast.success(`Invoice ${data.data.invoiceNumber} created!`);
         // Reset form
+        setSelectedCustomerId(null);
         setCustomerName(""); setCustomerEmail(""); setCustomerPhone("");
-        setBillingAddress(""); setNotes(""); setItems([emptyItem()]);
+        setBillingAddress(""); setGstNumber(""); setNotes(""); setItems([emptyItem()]);
         setDiscountAmount(0); setShippingAmount(0);
+        setOriginalCustomer(null);
         fetchInvoices();
         setTab("history");
       } else {
@@ -148,7 +256,7 @@ export default function AdminInvoicesPage() {
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold text-gray-800">Invoice Management</h1>
         <p className="text-muted-foreground mt-1">
-          Create and manage invoices for offline, wholesale, and in-store orders
+          Create and manage invoices with ERP-grade customer synchronization and pricing overrides
         </p>
       </div>
 
@@ -168,23 +276,46 @@ export default function AdminInvoicesPage() {
             {/* Builder Form */}
             <div className="xl:col-span-2 space-y-5">
               {/* Customer Info */}
-              <div className="bg-white rounded-2xl shadow-card p-6">
+              <div className="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
                 <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <span className="w-6 h-6 bg-primary-600 text-cream-100 rounded-full text-xs flex items-center justify-center font-bold">1</span>
                   Customer Information
                 </h2>
+                
+                <div className="mb-5 space-y-1.5">
+                  <Label>Search Master Profiles</Label>
+                  <CustomerCombobox
+                    value={customerName}
+                    onSelect={handleSelectCustomer}
+                    onCreateNew={handleCreateCustomerInline}
+                  />
+                  {!selectedCustomerId && customerName.trim().length > 0 && (
+                    <span className="text-[10px] text-primary-700 bg-primary-50 px-2 py-0.5 rounded font-medium flex items-center gap-1 w-fit mt-1">
+                      <Sparkles className="w-3 h-3" /> Creates inline customer profile automatically
+                    </span>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>Customer Name *</Label>
-                    <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Full name" className="rounded-xl" />
+                    <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Full name" className="rounded-xl border-gray-200 bg-white" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Email *</Label>
-                    <Input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="email@example.com" className="rounded-xl" />
+                    <Input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="email@example.com" className="rounded-xl border-gray-200 bg-white" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Phone</Label>
-                    <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+91 98765 43210" className="rounded-xl" />
+                    <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+91 98765 43210" className="rounded-xl border-gray-200 bg-white" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>GST Number</Label>
+                    <Input value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} placeholder="22AAAAA1111A1Z1" className="rounded-xl border-gray-200 bg-white uppercase" />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Billing Address</Label>
+                    <Textarea value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} placeholder="Customer billing address..." rows={2} className="rounded-xl border-gray-200 resize-none bg-white" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Payment Method</Label>
@@ -198,15 +329,38 @@ export default function AdminInvoicesPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="col-span-2 space-y-1.5">
-                    <Label>Billing Address</Label>
-                    <Textarea value={billingAddress} onChange={(e) => setBillingAddress(e.target.value)} placeholder="Customer billing address..." rows={2} className="rounded-xl resize-none" />
-                  </div>
                 </div>
+
+                {/* Profile Diff Checker Notification */}
+                {isProfileDifferent() && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5 }} 
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 p-3 bg-yellow-50 border border-yellow-100 rounded-xl flex items-start gap-3"
+                  >
+                    <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1.5 flex-1">
+                      <p className="text-xs font-semibold text-yellow-800">
+                        Customer information differs from stored profile.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Checkbox 
+                          id="update-profile" 
+                          checked={updateCustomerProfile} 
+                          onCheckedChange={(checked) => setUpdateCustomerProfile(!!checked)}
+                          className="border-yellow-400 text-yellow-700 focus-visible:ring-yellow-400"
+                        />
+                        <Label htmlFor="update-profile" className="text-xs font-medium text-yellow-700 cursor-pointer">
+                          Update master customer profile with these changes
+                        </Label>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
               </div>
 
               {/* Line Items */}
-              <div className="bg-white rounded-2xl shadow-card p-6">
+              <div className="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-semibold text-gray-800 flex items-center gap-2">
                     <span className="w-6 h-6 bg-primary-600 text-cream-100 rounded-full text-xs flex items-center justify-center font-bold">2</span>
@@ -217,7 +371,7 @@ export default function AdminInvoicesPage() {
                   </Button>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {/* Header */}
                   <div className="grid grid-cols-12 gap-2 text-xs text-muted-foreground font-medium px-1">
                     <div className="col-span-4">Item</div>
@@ -230,25 +384,27 @@ export default function AdminInvoicesPage() {
 
                   {items.map((item, i) => {
                     const { total } = calcItemTotal(item);
+                    const isPriceOverridden = item.originalPrice !== undefined && item.unitPrice !== item.originalPrice;
+                    const isTaxOverridden = item.originalTaxRate !== undefined && item.taxRate !== item.originalTaxRate;
+
                     return (
                       <motion.div
                         key={i}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="grid grid-cols-12 gap-2 items-start bg-gray-50 rounded-xl p-3"
+                        className="grid grid-cols-12 gap-2 items-start bg-gray-50/50 rounded-xl p-3 border border-gray-100"
                       >
-                        <div className="col-span-4">
-                          <Input
+                        <div className="col-span-4 space-y-1.5">
+                          <ProductCombobox
                             value={item.productName}
-                            onChange={(e) => updateItem(i, "productName", e.target.value)}
-                            placeholder="Product/Service name"
-                            className="h-9 text-sm rounded-lg border-gray-200"
+                            onSelect={(prod) => handleSelectProduct(i, prod)}
+                            onCreateNew={(name) => handleCreateProductInline(i, name)}
                           />
                           <Input
                             value={item.description}
                             onChange={(e) => updateItem(i, "description", e.target.value)}
                             placeholder="Description (optional)"
-                            className="h-8 text-xs rounded-lg border-gray-200 mt-1"
+                            className="h-8 text-xs rounded-lg border-gray-200"
                           />
                         </div>
                         <div className="col-span-2">
@@ -257,10 +413,10 @@ export default function AdminInvoicesPage() {
                             min="1"
                             value={item.quantity}
                             onChange={(e) => updateItem(i, "quantity", parseFloat(e.target.value) || 0)}
-                            className="h-9 text-sm text-center rounded-lg border-gray-200"
+                            className="h-9 text-sm text-center rounded-lg border-gray-200 bg-white"
                           />
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-2 space-y-1">
                           <div className="relative">
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
                             <Input
@@ -269,11 +425,18 @@ export default function AdminInvoicesPage() {
                               step="0.01"
                               value={item.unitPrice}
                               onChange={(e) => updateItem(i, "unitPrice", parseFloat(e.target.value) || 0)}
-                              className="h-9 text-sm pl-5 text-right rounded-lg border-gray-200"
+                              className={`h-9 text-sm pl-5 text-right rounded-lg border-gray-200 bg-white ${
+                                isPriceOverridden ? "border-amber-400 bg-amber-50/20" : ""
+                              }`}
                             />
                           </div>
+                          {isPriceOverridden && (
+                            <p className="text-[9px] text-amber-600 font-medium leading-none text-right">
+                              Master: ₹{item.originalPrice}
+                            </p>
+                          )}
                         </div>
-                        <div className="col-span-2">
+                        <div className="col-span-2 space-y-1">
                           <div className="relative">
                             <Input
                               type="number"
@@ -281,19 +444,26 @@ export default function AdminInvoicesPage() {
                               max="28"
                               value={item.taxRate}
                               onChange={(e) => updateItem(i, "taxRate", parseFloat(e.target.value) || 0)}
-                              className="h-9 text-sm text-center rounded-lg border-gray-200 pr-5"
+                              className={`h-9 text-sm text-center rounded-lg border-gray-200 bg-white ${
+                                isTaxOverridden ? "border-amber-400 bg-amber-50/20" : ""
+                              }`}
                             />
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                           </div>
+                          {isTaxOverridden && (
+                            <p className="text-[9px] text-amber-600 font-medium leading-none text-center">
+                              Master: {item.originalTaxRate}%
+                            </p>
+                          )}
                         </div>
-                        <div className="col-span-1 flex items-center justify-end pt-1">
+                        <div className="col-span-1 flex items-center justify-end pt-2">
                           <span className="text-sm font-bold text-primary-700">₹{total.toFixed(0)}</span>
                         </div>
-                        <div className="col-span-1 flex items-center justify-center">
+                        <div className="col-span-1 flex items-center justify-center pt-1.5">
                           <button
                             onClick={() => removeItem(i)}
                             disabled={items.length === 1}
-                            className="text-red-400 hover:text-red-600 disabled:opacity-20 transition-colors"
+                            className="text-red-400 hover:text-red-600 disabled:opacity-20 transition-colors p-1"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -305,7 +475,7 @@ export default function AdminInvoicesPage() {
               </div>
 
               {/* Charges + Notes */}
-              <div className="bg-white rounded-2xl shadow-card p-6">
+              <div className="bg-white rounded-2xl shadow-card p-6 border border-gray-100">
                 <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <span className="w-6 h-6 bg-primary-600 text-cream-100 rounded-full text-xs flex items-center justify-center font-bold">3</span>
                   Adjustments & Notes
@@ -313,15 +483,15 @@ export default function AdminInvoicesPage() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="space-y-1.5">
                     <Label>Discount Amount (₹)</Label>
-                    <Input type="number" min="0" value={discountAmount} onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)} className="rounded-xl" />
+                    <Input type="number" min="0" value={discountAmount} onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)} className="rounded-xl border-gray-200 bg-white" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Shipping Charges (₹)</Label>
-                    <Input type="number" min="0" value={shippingAmount} onChange={(e) => setShippingAmount(parseFloat(e.target.value) || 0)} className="rounded-xl" />
+                    <Input type="number" min="0" value={shippingAmount} onChange={(e) => setShippingAmount(parseFloat(e.target.value) || 0)} className="rounded-xl border-gray-200 bg-white" />
                   </div>
                   <div className="col-span-2 space-y-1.5">
                     <Label>Notes / Terms</Label>
-                    <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Thank you for your business! Goods once sold are not returnable..." rows={3} className="rounded-xl resize-none" />
+                    <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Thank you for your business! Goods once sold are not returnable..." rows={3} className="rounded-xl border-gray-200 resize-none bg-white" />
                   </div>
                 </div>
               </div>
@@ -329,7 +499,7 @@ export default function AdminInvoicesPage() {
 
             {/* Live Preview / Summary */}
             <div className="xl:col-span-1">
-              <div className="bg-white rounded-2xl shadow-card p-6 sticky top-8">
+              <div className="bg-white rounded-2xl shadow-card p-6 sticky top-8 border border-gray-100">
                 <h2 className="font-display text-lg font-bold text-primary-800 mb-5">Invoice Preview</h2>
 
                 {/* Header */}
@@ -339,9 +509,22 @@ export default function AdminInvoicesPage() {
                 </div>
 
                 <div className="space-y-2 text-sm mb-4">
-                  {customerName && <div><span className="text-muted-foreground text-xs">Bill to:</span><p className="font-medium">{customerName}</p></div>}
+                  {customerName && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Bill to:</span>
+                      <p className="font-medium flex items-center gap-1.5">
+                        {customerName}
+                        {selectedCustomerId && (
+                          <span className="font-mono text-[9px] px-1.5 py-0.5 bg-primary-100 text-primary-800 rounded">
+                            Master
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                   {customerEmail && <p className="text-xs text-muted-foreground">{customerEmail}</p>}
                   {customerPhone && <p className="text-xs text-muted-foreground">{customerPhone}</p>}
+                  {gstNumber && <p className="text-xs text-muted-foreground font-mono">GST: {gstNumber.toUpperCase()}</p>}
                 </div>
 
                 {items.filter((i) => i.productName).length > 0 && (
@@ -352,7 +535,10 @@ export default function AdminInvoicesPage() {
                         <div key={i} className="flex justify-between">
                           <div>
                             <p className="font-medium text-gray-700 text-xs">{item.productName}</p>
-                            <p className="text-xs text-muted-foreground">{item.quantity} × ₹{item.unitPrice}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.quantity} × ₹{item.unitPrice}
+                              {item.taxRate > 0 && ` (+${item.taxRate}% Tax)`}
+                            </p>
                           </div>
                           <span className="text-xs font-bold text-primary-700">
                             ₹{calcItemTotal(item).total.toFixed(0)}
@@ -399,7 +585,7 @@ export default function AdminInvoicesPage() {
                   id="create-invoice-btn"
                   onClick={handleCreate}
                   disabled={creating}
-                  className="w-full mt-6 h-12 bg-primary-600 hover:bg-primary-700 text-cream-100 font-bold rounded-xl gap-2"
+                  className="w-full mt-6 h-12 bg-primary-600 hover:bg-primary-700 text-cream-100 font-bold rounded-xl gap-2 shadow-sm transition-all"
                 >
                   <FileText className="w-4 h-4" />
                   {creating ? "Creating..." : "Create Invoice"}
@@ -411,7 +597,7 @@ export default function AdminInvoicesPage() {
 
         {/* ──── Invoice History ──────────────────────────────────── */}
         <TabsContent value="history">
-          <div className="bg-white rounded-2xl shadow-card overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-card overflow-hidden border border-gray-100">
             {loading ? (
               <div className="p-6 space-y-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div>
             ) : invoices.length === 0 ? (

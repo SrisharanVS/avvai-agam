@@ -61,7 +61,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      customerName, customerEmail, customerPhone, billingAddress,
+      customerId, customerName, customerEmail, customerPhone, billingAddress, gstNumber,
+      updateCustomerProfile = true,
       taxRate = 0, discountAmount = 0, shippingAmount = 0,
       paymentMethod = "COD", notes, items,
     } = body;
@@ -73,22 +74,101 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate totals
+    // 1. Resolve Customer profile
+    let finalCustomerId: string | null = customerId || null;
+    let customerRecord: any = null;
+
+    if (finalCustomerId) {
+      customerRecord = await prisma.customer.findUnique({ where: { id: finalCustomerId } });
+    } else {
+      // Lookup customer by email
+      customerRecord = await prisma.customer.findFirst({
+        where: { email: { equals: customerEmail.trim().toLowerCase(), mode: "insensitive" } }
+      });
+    }
+
+    if (customerRecord) {
+      finalCustomerId = customerRecord.id;
+      
+      // Update Customer profile if checkbox is checked and values differ
+      const emailTrim = customerEmail.trim().toLowerCase();
+      const phoneTrim = customerPhone?.trim() || null;
+      const addressTrim = billingAddress?.trim() || null;
+      const gstTrim = gstNumber?.trim() || null;
+
+      const hasDiff = 
+        customerRecord.name !== customerName.trim() ||
+        (customerRecord.email || "").toLowerCase() !== emailTrim ||
+        (customerRecord.phone || null) !== phoneTrim ||
+        (customerRecord.address || null) !== addressTrim ||
+        (customerRecord.gstNumber || null) !== gstTrim;
+
+      if (hasDiff && updateCustomerProfile) {
+        customerRecord = await prisma.customer.update({
+          where: { id: customerRecord.id },
+          data: {
+            name: customerName.trim(),
+            email: emailTrim,
+            phone: phoneTrim,
+            address: addressTrim,
+            gstNumber: gstTrim
+          }
+        });
+        console.log(`Updated customer profile ${customerRecord.customerId} inline with invoice changes.`);
+      }
+    } else {
+      // Automatically Create Customer if they don't exist
+      const latestCustomer = await prisma.customer.findFirst({
+        orderBy: { customerId: "desc" },
+        where: { customerId: { startsWith: "CUS-" } }
+      });
+      let nextNum = 1;
+      if (latestCustomer) {
+        const parts = latestCustomer.customerId.split("-");
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num)) {
+          nextNum = num + 1;
+        }
+      }
+      const newCustomerId = `CUS-${String(nextNum).padStart(6, "0")}`;
+
+      customerRecord = await prisma.customer.create({
+        data: {
+          customerId: newCustomerId,
+          name: customerName.trim(),
+          email: customerEmail.trim().toLowerCase(),
+          phone: customerPhone?.trim() || null,
+          address: billingAddress?.trim() || null,
+          gstNumber: gstNumber?.trim() || null
+        }
+      });
+      finalCustomerId = customerRecord.id;
+      console.log(`Auto-created Customer ${newCustomerId} during invoice creation.`);
+    }
+
+    // 2. Process items & fetch product details for snapshots
     let subtotal = 0;
     let totalTax = 0;
-    const processedItems = items.map((item: {
-      productName: string;
-      description?: string;
-      quantity: number;
-      unitPrice: number;
-      taxRate?: number;
-    }) => {
+    
+    const processedItems = [];
+    for (const item of items) {
       const itemTaxRate = item.taxRate ?? taxRate;
       const itemTotal = item.quantity * item.unitPrice;
       const itemTax = itemTotal * (itemTaxRate / 100);
       subtotal += itemTotal;
       totalTax += itemTax;
-      return {
+
+      // Find product matching name or id to log snapshots
+      let product: any = null;
+      if (item.productId) {
+        product = await prisma.product.findUnique({ where: { id: item.productId } });
+      } else {
+        product = await prisma.product.findFirst({
+          where: { name: { equals: item.productName, mode: "insensitive" } }
+        });
+      }
+
+      processedItems.push({
         productName: item.productName,
         description: item.description || null,
         quantity: item.quantity,
@@ -96,8 +176,15 @@ export async function POST(request: NextRequest) {
         taxRate: itemTaxRate,
         taxAmount: parseFloat(itemTax.toFixed(2)),
         total: parseFloat((itemTotal + itemTax).toFixed(2)),
-      };
-    });
+        // ERP Snapshots & relation
+        productId: product?.id || null,
+        productNameSnapshot: item.productName,
+        skuSnapshot: product?.sku || "PROD-UNKNOWN",
+        unitSnapshot: product?.unit || "units",
+        unitPriceSnapshot: item.unitPrice,
+        taxRateSnapshot: itemTaxRate
+      });
+    }
 
     const totalAmount = subtotal + totalTax + shippingAmount - discountAmount;
 
@@ -117,6 +204,14 @@ export async function POST(request: NextRequest) {
         totalAmount: parseFloat(totalAmount.toFixed(2)),
         paymentMethod,
         notes: notes || null,
+        // ERP snapshots & links
+        customerId: finalCustomerId,
+        customerIdSnapshot: customerRecord?.customerId || null,
+        customerNameSnapshot: customerName,
+        customerPhoneSnapshot: customerPhone || null,
+        customerEmailSnapshot: customerEmail,
+        customerAddressSnapshot: billingAddress || null,
+        gstNumberSnapshot: gstNumber || customerRecord?.gstNumber || null,
         items: { create: processedItems },
       },
       include: { items: true },

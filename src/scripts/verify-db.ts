@@ -37,7 +37,7 @@ async function run() {
       console.log(`- customerNameSnapshot: ${lastInv.customerNameSnapshot}`);
       console.log(`- customerEmailSnapshot: ${lastInv.customerEmailSnapshot}`);
       console.log(`- customerPhoneSnapshot: ${lastInv.customerPhoneSnapshot}`);
-      console.log(`- billingAddressSnapshot: ${lastInv.billingAddressSnapshot}`);
+      console.log(`- customerAddressSnapshot: ${lastInv.customerAddressSnapshot}`);
       console.log(`- gstNumberSnapshot: ${lastInv.gstNumberSnapshot}`);
       console.log("Line Items Snapshots:");
       lastInv.items.forEach((item) => {

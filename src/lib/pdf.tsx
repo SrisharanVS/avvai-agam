@@ -199,6 +199,7 @@ interface PDFInvoiceData {
   taxAmount: number;
   discountAmount: number;
   shippingAmount: number;
+  gatewayFee?: number;
   totalAmount: number;
   paymentMethod: string;
   notes?: string | null;
@@ -328,6 +329,12 @@ export function InvoicePDF({ invoice }: { invoice: PDFInvoiceData }) {
               <View style={styles.totalsRow}>
                 <Text style={styles.totalsLabel}>Shipping:</Text>
                 <Text style={styles.totalsVal}>Rs. {invoice.shippingAmount.toFixed(2)}</Text>
+              </View>
+            )}
+            {invoice.gatewayFee !== undefined && invoice.gatewayFee > 0 && (
+              <View style={styles.totalsRow}>
+                <Text style={styles.totalsLabel}>Gateway Fee (2.36%):</Text>
+                <Text style={styles.totalsVal}>Rs. {invoice.gatewayFee.toFixed(2)}</Text>
               </View>
             )}
             {invoice.discountAmount > 0 && (

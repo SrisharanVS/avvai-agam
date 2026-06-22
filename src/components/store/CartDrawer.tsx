@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ShoppingCart, Trash2, Plus, Minus, Leaf } from "lucide-react";
 import Image from "next/image";
@@ -10,11 +11,28 @@ import { LinkButton } from "@/components/ui/link-button";
 import { Separator } from "@/components/ui/separator";
 
 export default function CartDrawer() {
-  const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, totalPrice } =
+  const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal } =
     useCartStore();
+  const [settings, setSettings] = useState<{ shippingFee: number; freeShippingThreshold: number } | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/settings")
+        .then((r) => r.json())
+        .then((resData) => {
+          if (resData.success) {
+            setSettings(resData.data);
+          }
+        })
+        .catch((err) => console.error("Failed to load settings:", err));
+    }
+  }, [isOpen]);
+
   const sub = subtotal();
-  const total = totalPrice();
-  const shipping = sub >= 500 ? 0 : 60;
+  const shippingFee = settings ? settings.shippingFee : 60;
+  const freeShippingThreshold = settings ? settings.freeShippingThreshold : 500;
+  const shipping = sub >= freeShippingThreshold ? 0 : shippingFee;
+  const total = sub + shipping;
 
   return (
     <AnimatePresence>
@@ -186,7 +204,7 @@ export default function CartDrawer() {
                   </div>
                   {shipping > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      Free shipping on orders above ₹500
+                      Free shipping on orders above ₹{freeShippingThreshold}
                     </p>
                   )}
                   <Separator />

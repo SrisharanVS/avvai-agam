@@ -12,6 +12,7 @@ export async function proxy(request: NextRequest) {
   // Publicly accessible paths under matched API routes
   const isPublicApi =
     (request.method === "POST" && pathname === "/api/orders") ||
+    (request.method === "GET" && pathname === "/api/settings") ||
     (request.method === "GET" &&
       pathname.startsWith("/api/invoices/by-order/") &&
       pathname.endsWith("/download"));
@@ -75,5 +76,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/api/invoices/:path*", "/api/orders/:path*", "/api/upload/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/api/invoices/:path*", "/api/orders/:path*", "/api/upload/:path*", "/api/settings"],
 };

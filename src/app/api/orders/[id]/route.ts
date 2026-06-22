@@ -27,6 +27,7 @@ export async function GET(
         taxAmount: Number(order.taxAmount),
         shippingAmount: Number(order.shippingAmount),
         discountAmount: Number(order.discountAmount),
+        gatewayFee: Number(order.gatewayFee),
         totalAmount: Number(order.totalAmount),
         items: order.items.map((i) => ({
           ...i,

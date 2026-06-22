@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, Package, ShoppingCart, FolderOpen, FileText,
   Users, Mail, LogOut, Leaf, Menu, X, ChevronRight,
-  Building2, ClipboardList, Boxes, BarChart2,
+  Building2, ClipboardList, Boxes, BarChart2, Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ const navSections = [
     title: "Overview",
     items: [
       { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/dashboard/settings", label: "Settings", icon: Settings },
     ],
   },
   {

@@ -58,7 +58,14 @@ export const ModelName = {
   OrderItem: 'OrderItem',
   Invoice: 'Invoice',
   InvoiceItem: 'InvoiceItem',
-  NewsletterSubscriber: 'NewsletterSubscriber'
+  NewsletterSubscriber: 'NewsletterSubscriber',
+  Supplier: 'Supplier',
+  PurchaseOrder: 'PurchaseOrder',
+  PurchaseOrderItem: 'PurchaseOrderItem',
+  InventoryMovement: 'InventoryMovement',
+  Payment: 'Payment',
+  Customer: 'Customer',
+  SystemSetting: 'SystemSetting'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -121,6 +128,14 @@ export const ProductScalarFieldEnum = {
   tags: 'tags',
   rating: 'rating',
   reviewCount: 'reviewCount',
+  costPrice: 'costPrice',
+  averageCostPrice: 'averageCostPrice',
+  lastPurchasePrice: 'lastPurchasePrice',
+  minimumStockLevel: 'minimumStockLevel',
+  sku: 'sku',
+  unit: 'unit',
+  defaultTaxRate: 'defaultTaxRate',
+  active: 'active',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -144,6 +159,7 @@ export const OrderScalarFieldEnum = {
   taxAmount: 'taxAmount',
   shippingAmount: 'shippingAmount',
   discountAmount: 'discountAmount',
+  gatewayFee: 'gatewayFee',
   totalAmount: 'totalAmount',
   paymentMethod: 'paymentMethod',
   paymentStatus: 'paymentStatus',
@@ -183,11 +199,19 @@ export const InvoiceScalarFieldEnum = {
   taxRate: 'taxRate',
   discountAmount: 'discountAmount',
   shippingAmount: 'shippingAmount',
+  gatewayFee: 'gatewayFee',
   totalAmount: 'totalAmount',
   paymentMethod: 'paymentMethod',
   status: 'status',
   notes: 'notes',
   pdfUrl: 'pdfUrl',
+  customerId: 'customerId',
+  customerIdSnapshot: 'customerIdSnapshot',
+  customerNameSnapshot: 'customerNameSnapshot',
+  customerPhoneSnapshot: 'customerPhoneSnapshot',
+  customerEmailSnapshot: 'customerEmailSnapshot',
+  customerAddressSnapshot: 'customerAddressSnapshot',
+  gstNumberSnapshot: 'gstNumberSnapshot',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -204,7 +228,13 @@ export const InvoiceItemScalarFieldEnum = {
   unitPrice: 'unitPrice',
   taxRate: 'taxRate',
   taxAmount: 'taxAmount',
-  total: 'total'
+  total: 'total',
+  productId: 'productId',
+  productNameSnapshot: 'productNameSnapshot',
+  skuSnapshot: 'skuSnapshot',
+  unitSnapshot: 'unitSnapshot',
+  unitPriceSnapshot: 'unitPriceSnapshot',
+  taxRateSnapshot: 'taxRateSnapshot'
 } as const
 
 export type InvoiceItemScalarFieldEnum = (typeof InvoiceItemScalarFieldEnum)[keyof typeof InvoiceItemScalarFieldEnum]
@@ -218,6 +248,120 @@ export const NewsletterSubscriberScalarFieldEnum = {
 } as const
 
 export type NewsletterSubscriberScalarFieldEnum = (typeof NewsletterSubscriberScalarFieldEnum)[keyof typeof NewsletterSubscriberScalarFieldEnum]
+
+
+export const SupplierScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  contactPerson: 'contactPerson',
+  email: 'email',
+  phone: 'phone',
+  gstNumber: 'gstNumber',
+  address: 'address',
+  notes: 'notes',
+  isArchived: 'isArchived',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SupplierScalarFieldEnum = (typeof SupplierScalarFieldEnum)[keyof typeof SupplierScalarFieldEnum]
+
+
+export const PurchaseOrderScalarFieldEnum = {
+  id: 'id',
+  poNumber: 'poNumber',
+  supplierId: 'supplierId',
+  status: 'status',
+  expectedDeliveryDate: 'expectedDeliveryDate',
+  notes: 'notes',
+  subtotal: 'subtotal',
+  taxAmount: 'taxAmount',
+  totalAmount: 'totalAmount',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PurchaseOrderScalarFieldEnum = (typeof PurchaseOrderScalarFieldEnum)[keyof typeof PurchaseOrderScalarFieldEnum]
+
+
+export const PurchaseOrderItemScalarFieldEnum = {
+  id: 'id',
+  purchaseOrderId: 'purchaseOrderId',
+  productId: 'productId',
+  productName: 'productName',
+  quantity: 'quantity',
+  receivedQuantity: 'receivedQuantity',
+  unit: 'unit',
+  costPrice: 'costPrice',
+  taxRate: 'taxRate',
+  taxAmount: 'taxAmount',
+  total: 'total',
+  productNameSnapshot: 'productNameSnapshot',
+  skuSnapshot: 'skuSnapshot',
+  unitSnapshot: 'unitSnapshot',
+  costPriceSnapshot: 'costPriceSnapshot',
+  taxRateSnapshot: 'taxRateSnapshot'
+} as const
+
+export type PurchaseOrderItemScalarFieldEnum = (typeof PurchaseOrderItemScalarFieldEnum)[keyof typeof PurchaseOrderItemScalarFieldEnum]
+
+
+export const InventoryMovementScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  movementType: 'movementType',
+  quantity: 'quantity',
+  previousStock: 'previousStock',
+  newStock: 'newStock',
+  referenceType: 'referenceType',
+  referenceId: 'referenceId',
+  notes: 'notes',
+  createdAt: 'createdAt'
+} as const
+
+export type InventoryMovementScalarFieldEnum = (typeof InventoryMovementScalarFieldEnum)[keyof typeof InventoryMovementScalarFieldEnum]
+
+
+export const PaymentScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  razorpayOrderId: 'razorpayOrderId',
+  razorpayPaymentId: 'razorpayPaymentId',
+  amount: 'amount',
+  currency: 'currency',
+  status: 'status',
+  paymentMethod: 'paymentMethod',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentScalarFieldEnum = (typeof PaymentScalarFieldEnum)[keyof typeof PaymentScalarFieldEnum]
+
+
+export const CustomerScalarFieldEnum = {
+  id: 'id',
+  customerId: 'customerId',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  address: 'address',
+  gstNumber: 'gstNumber',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CustomerScalarFieldEnum = (typeof CustomerScalarFieldEnum)[keyof typeof CustomerScalarFieldEnum]
+
+
+export const SystemSettingScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  value: 'value',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SystemSettingScalarFieldEnum = (typeof SystemSettingScalarFieldEnum)[keyof typeof SystemSettingScalarFieldEnum]
 
 
 export const SortOrder = {

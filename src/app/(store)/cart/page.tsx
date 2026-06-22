@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useEffect } from "react";
+
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -10,10 +12,25 @@ import { LinkButton } from "@/components/ui/link-button";
 import { Separator } from "@/components/ui/separator";
 
 export default function CartPage() {
-  const { items, removeItem, updateQuantity, subtotal, totalPrice } = useCartStore();
+  const { items, removeItem, updateQuantity, subtotal } = useCartStore();
+  const [settings, setSettings] = useState<{ shippingFee: number; freeShippingThreshold: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((resData) => {
+        if (resData.success) {
+          setSettings(resData.data);
+        }
+      })
+      .catch((err) => console.error("Failed to load settings:", err));
+  }, []);
+
   const sub = subtotal();
-  const total = totalPrice();
-  const shipping = sub >= 500 ? 0 : 60;
+  const shippingFee = settings ? settings.shippingFee : 60;
+  const freeShippingThreshold = settings ? settings.freeShippingThreshold : 500;
+  const shipping = sub >= freeShippingThreshold ? 0 : shippingFee;
+  const total = sub + shipping;
 
   if (items.length === 0) {
     return (
@@ -126,7 +143,7 @@ export default function CartPage() {
                 </div>
                 {shipping > 0 && (
                   <p className="text-xs text-muted-foreground bg-amber-50 px-3 py-2 rounded-lg">
-                    💡 Add ₹{(500 - sub).toFixed(0)} more for free shipping!
+                    💡 Add ₹{(freeShippingThreshold - sub).toFixed(0)} more for free shipping!
                   </p>
                 )}
               </div>

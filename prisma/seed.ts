@@ -31,6 +31,19 @@ async function main() {
     });
     console.log(`✓ Admin created: ${adminEmail}`);
 
+    // Create default settings
+    await prisma.systemSetting.upsert({
+        where: { key: "shipping_fee" },
+        update: {},
+        create: { key: "shipping_fee", value: "60" },
+    });
+    await prisma.systemSetting.upsert({
+        where: { key: "free_shipping_threshold" },
+        update: {},
+        create: { key: "free_shipping_threshold", value: "500" },
+    });
+    console.log("✓ Default settings created");
+
     // Create categories
     const createdCategories: Record<string, string> = {};
     for (const cat of categories) {

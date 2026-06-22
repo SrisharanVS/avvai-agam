@@ -16,8 +16,13 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const status = searchParams.get("status");
+    const paymentStatus = searchParams.get("paymentStatus");
 
-    const where = status ? { orderStatus: status } : {};
+    // Build where clause dynamically to support both filters
+    const where: { orderStatus?: string; paymentStatus?: string } = {};
+    if (status) where.orderStatus = status;
+    if (paymentStatus) where.paymentStatus = paymentStatus;
+
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
@@ -38,6 +43,7 @@ export async function GET(request: NextRequest) {
         taxAmount: Number(o.taxAmount),
         shippingAmount: Number(o.shippingAmount),
         discountAmount: Number(o.discountAmount),
+        gatewayFee: Number(o.gatewayFee),
         totalAmount: Number(o.totalAmount),
         items: o.items.map((i) => ({
           ...i,
@@ -88,14 +94,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const settings = await prisma.systemSetting.findMany();
+    const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
+    const shippingFee = parseFloat(settingsMap.get("shipping_fee") ?? "60");
+    const freeShippingThreshold = parseFloat(
+      settingsMap.get("free_shipping_threshold") ?? "500"
+    );
+
     const subtotal = items.reduce(
       (sum: number, i: { quantity: number; unitPrice: number }) =>
         sum + i.quantity * i.unitPrice,
       0
     );
-    const shippingAmount = subtotal >= 500 ? 0 : 60;
+    const shippingAmount = subtotal >= freeShippingThreshold ? 0 : shippingFee;
     const taxAmount = 0;
     const discountAmount = 0;
+    const gatewayFee = 0;
     const totalAmount = subtotal + shippingAmount + taxAmount - discountAmount;
 
     const orderNumber = generateOrderNumber();
@@ -117,6 +131,7 @@ export async function POST(request: NextRequest) {
           taxAmount,
           shippingAmount,
           discountAmount,
+          gatewayFee,
           totalAmount,
           paymentMethod: paymentMethod || "COD",
           couponCode: couponCode || null,
@@ -181,6 +196,7 @@ export async function POST(request: NextRequest) {
           taxRate: 0,
           discountAmount,
           shippingAmount,
+          gatewayFee,
           totalAmount,
           paymentMethod: paymentMethod || "COD",
           status: "SENT",
@@ -218,6 +234,7 @@ export async function POST(request: NextRequest) {
           taxAmount: Number(invoice.taxAmount),
           discountAmount: Number(invoice.discountAmount),
           shippingAmount: Number(invoice.shippingAmount),
+          gatewayFee: Number(invoice.gatewayFee),
           totalAmount: Number(invoice.totalAmount),
           paymentMethod: invoice.paymentMethod,
           notes: "Thank you for shopping with Avvai Natural Foods! Your organic products will be delivered soon.",
@@ -256,6 +273,7 @@ export async function POST(request: NextRequest) {
         subtotal: Number(order.subtotal),
         totalAmount: Number(order.totalAmount),
         shippingAmount: Number(order.shippingAmount),
+        gatewayFee: Number(order.gatewayFee),
         items: order.items.map((i) => ({
           ...i,
           unitPrice: Number(i.unitPrice),

@@ -116,6 +116,7 @@ export interface OrderSummary {
   taxAmount: number;
   shippingAmount: number;
   discountAmount: number;
+  gatewayFee?: number;
   totalAmount: number;
   paymentMethod: string;
   paymentStatus: string;
@@ -146,6 +147,7 @@ export interface InvoiceSummary {
   taxAmount: number;
   discountAmount: number;
   shippingAmount: number;
+  gatewayFee?: number;
   totalAmount: number;
   status: "DRAFT" | "SENT" | "PAID" | "CANCELLED";
   createdAt: string;

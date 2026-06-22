@@ -95,6 +95,7 @@ model Order {
   taxAmount       Decimal     @default(0) @db.Decimal(10, 2)
   shippingAmount  Decimal     @default(0) @db.Decimal(10, 2)
   discountAmount  Decimal     @default(0) @db.Decimal(10, 2)
+  gatewayFee      Decimal     @default(0) @db.Decimal(10, 2)
   totalAmount     Decimal     @db.Decimal(10, 2)
   paymentMethod   String      @default("COD")
   paymentStatus   String      @default("PENDING")
@@ -102,10 +103,12 @@ model Order {
   couponCode      String?
   items           OrderItem[]
   invoice         Invoice?
+  payment         Payment?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([orderStatus])
+  @@index([paymentStatus])
   @@index([customerEmail])
   @@map("orders")
 }
@@ -140,6 +143,7 @@ model Invoice {
   taxRate        Decimal       @default(0) @db.Decimal(5, 2)
   discountAmount Decimal       @default(0) @db.Decimal(10, 2)
   shippingAmount Decimal       @default(0) @db.Decimal(10, 2)
+  gatewayFee     Decimal       @default(0) @db.Decimal(10, 2)
   totalAmount    Decimal       @db.Decimal(10, 2)
   paymentMethod  String        @default("COD")
   status         InvoiceStatus @default(DRAFT)
@@ -313,6 +317,33 @@ enum MovementType {
   DAMAGED
 }
 
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+// ─── Payment Model ────────────────────────────────────────────────────────────
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String?       @unique
+  order             Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  razorpayOrderId   String        @unique
+  razorpayPaymentId String?
+  amount            Int           // stored in paise (1 INR = 100 paise)
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  paymentMethod     String?       // upi, card, netbanking, wallet, etc.
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([razorpayOrderId])
+  @@index([status])
+  @@map("payments")
+}
+
 model Customer {
   id              String    @id @default(cuid())
   customerId      String    @unique
@@ -327,4 +358,14 @@ model Customer {
 
   @@index([customerId])
   @@map("customers")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
 }

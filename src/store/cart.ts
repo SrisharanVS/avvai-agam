@@ -94,7 +94,7 @@ export const useCartStore = create<CartStore>()(
 
       totalPrice: () => {
         const sub = get().subtotal();
-        const shipping = sub >= 500 ? 0 : 60;
+        const shipping = 0;
         return sub + shipping;
       },
     }),

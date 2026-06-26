@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingCart, Menu, X, Leaf, Search } from "lucide-react";
 import { useCartStore } from "@/store/cart";
 import CartDrawer from "./CartDrawer";
+import Image from "next/image";
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -49,8 +50,9 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Leaf className="w-4 h-4 text-cream-100" />
+              <div className="w-32 h-16 flex items-center justify-center group-hover:scale-110 transition-transform">
+                {/* <Leaf className="w-4 h-4 text-cream-100" /> */}
+                <Image src="/avvai-ayya1-removebg-preview.png" alt="" width={1200} height={600} />
               </div>
               <span
                 className={`text-xl md:text-2xl font-display font-bold transition-colors ${showSolid ? "text-primary-600" : "text-white"
@@ -62,7 +64,7 @@ export default function Navbar() {
                 className={`hidden sm:block text-xs font-medium tracking-widest uppercase mt-1 transition-colors ${showSolid ? "text-olive-500" : "text-primary-200"
                   }`}
               >
-                Natural Foods
+                Iyarkai Agam
               </span>
             </Link>
 

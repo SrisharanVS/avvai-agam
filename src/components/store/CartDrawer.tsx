@@ -9,11 +9,12 @@ import { useCartStore } from "@/store/cart";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { Separator } from "@/components/ui/separator";
+import { calculateShipping } from "@/lib/utils";
 
 export default function CartDrawer() {
   const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal } =
     useCartStore();
-  const [settings, setSettings] = useState<{ shippingFee: number; freeShippingThreshold: number } | null>(null);
+  const [settings, setSettings] = useState<{ shippingFeeTN: number; shippingFeeOther: number; freeShippingThreshold: number } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -29,9 +30,17 @@ export default function CartDrawer() {
   }, [isOpen]);
 
   const sub = subtotal();
-  const shippingFee = settings ? settings.shippingFee : 60;
+  const shippingFeeTN = settings ? settings.shippingFeeTN : 60;
+  const shippingFeeOther = settings ? settings.shippingFeeOther : 100;
   const freeShippingThreshold = settings ? settings.freeShippingThreshold : 500;
-  const shipping = sub >= freeShippingThreshold ? 0 : shippingFee;
+
+  const shipping = calculateShipping({
+    items,
+    subtotal: sub,
+    shippingFeeTN,
+    shippingFeeOther,
+    freeShippingThreshold,
+  });
   const total = sub + shipping;
 
   return (
@@ -202,9 +211,12 @@ export default function CartDrawer() {
                       {shipping === 0 ? "FREE" : `₹${shipping}`}
                     </span>
                   </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                    Calculated for Tamil Nadu. Outside TN flat rate ₹{shippingFeeOther}/kg applies.
+                  </p>
                   {shipping > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Free shipping on orders above ₹{freeShippingThreshold}
+                    <p className="text-xs text-muted-foreground bg-amber-50 px-3 py-1.5 rounded-lg">
+                      💡 Add ₹{(freeShippingThreshold - sub).toFixed(0)} more for free shipping!
                     </p>
                   )}
                   <Separator />

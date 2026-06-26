@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/store/cart";
 import { toast } from "sonner";
+import { calculateShipping } from "@/lib/utils";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("RAZORPAY");
   const [paymentFailed, setPaymentFailed] = useState(false);
   const [failureMsg, setFailureMsg] = useState("");
-  const [settings, setSettings] = useState<{ shippingFee: number; freeShippingThreshold: number } | null>(null);
+  const [settings, setSettings] = useState<{ shippingFeeTN: number; shippingFeeOther: number; freeShippingThreshold: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -116,21 +117,34 @@ export default function CheckoutPage() {
       .catch((err) => console.error("Failed to load settings:", err));
   }, []);
 
-  const sub = subtotal();
-  const shippingFee = settings ? settings.shippingFee : 60;
-  const freeShippingThreshold = settings ? settings.freeShippingThreshold : 500;
-  const shipping = sub >= freeShippingThreshold ? 0 : shippingFee;
-  const gatewayFee = paymentMethod === "RAZORPAY" ? Math.round((sub + shipping) * 0.0236 * 100) / 100 : 0;
-  const total = sub + shipping + gatewayFee;
-
   const {
     register,
     handleSubmit,
     getValues,
+    watch,
     formState: { errors },
   } = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
   });
+
+  const selectedState = watch("state");
+
+  const sub = subtotal();
+  const shippingFeeTN = settings ? settings.shippingFeeTN : 60;
+  const shippingFeeOther = settings ? settings.shippingFeeOther : 100;
+  const freeShippingThreshold = settings ? settings.freeShippingThreshold : 500;
+
+  const shipping = calculateShipping({
+    items,
+    subtotal: sub,
+    state: selectedState,
+    shippingFeeTN,
+    shippingFeeOther,
+    freeShippingThreshold,
+  });
+
+  const gatewayFee = paymentMethod === "RAZORPAY" ? Math.round((sub + shipping) * 0.0236 * 100) / 100 : 0;
+  const total = sub + shipping + gatewayFee;
 
 
 
@@ -200,6 +214,7 @@ export default function CheckoutPage() {
             customerName: data.customerName,
             customerEmail: data.customerEmail,
             customerPhone: data.customerPhone,
+            state: data.state,
           }),
         });
 
@@ -541,33 +556,6 @@ export default function CheckoutPage() {
                       ))}
                     </div>
                   </div>
-                </label>
-
-                {/* COD option */}
-                <label
-                  htmlFor="payment-cod"
-                  className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${paymentMethod === "COD"
-                    ? "border-primary-500 bg-primary-50"
-                    : "border-cream-300 bg-gray-50 hover:border-primary-300"
-                    }`}
-                >
-                  <input
-                    id="payment-cod"
-                    type="radio"
-                    name="paymentMethod"
-                    value="COD"
-                    checked={paymentMethod === "COD"}
-                    onChange={() => setPaymentMethod("COD")}
-                    className="accent-primary-600"
-                  />
-                  <Truck className="w-5 h-5 text-primary-600 shrink-0" />
-                  <div className="flex-1">
-                    <p className="font-semibold text-primary-700">Cash on Delivery</p>
-                    <p className="text-xs text-muted-foreground">Pay when your order arrives</p>
-                  </div>
-                  {paymentMethod === "COD" && (
-                    <CheckCircle2 className="w-4 h-4 text-primary-600" />
-                  )}
                 </label>
               </div>
             </div>

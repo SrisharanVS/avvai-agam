@@ -33,9 +33,14 @@ async function main() {
 
     // Create default settings
     await prisma.systemSetting.upsert({
-        where: { key: "shipping_fee" },
+        where: { key: "shipping_fee_tn" },
         update: {},
-        create: { key: "shipping_fee", value: "60" },
+        create: { key: "shipping_fee_tn", value: "60" },
+    });
+    await prisma.systemSetting.upsert({
+        where: { key: "shipping_fee_other" },
+        update: {},
+        create: { key: "shipping_fee_other", value: "100" },
     });
     await prisma.systemSetting.upsert({
         where: { key: "free_shipping_threshold" },

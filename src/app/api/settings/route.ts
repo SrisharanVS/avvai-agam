@@ -7,7 +7,8 @@ export async function GET(request: NextRequest) {
     const settings = await prisma.systemSetting.findMany();
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
-    const shippingFee = parseFloat(settingsMap.get("shipping_fee") ?? "60");
+    const shippingFeeTN = parseFloat(settingsMap.get("shipping_fee_tn") ?? "60");
+    const shippingFeeOther = parseFloat(settingsMap.get("shipping_fee_other") ?? "100");
     const freeShippingThreshold = parseFloat(
       settingsMap.get("free_shipping_threshold") ?? "500"
     );
@@ -15,8 +16,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        shippingFee,
+        shippingFeeTN,
+        shippingFeeOther,
         freeShippingThreshold,
+        // Fallback for backward compatibility
+        shippingFee: shippingFeeTN,
       },
     });
   } catch (error) {
@@ -39,16 +43,20 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { shippingFee, freeShippingThreshold } = body;
+    const { shippingFeeTN, shippingFeeOther, freeShippingThreshold } = body;
 
-    if (typeof shippingFee !== "number" || typeof freeShippingThreshold !== "number") {
+    if (
+      typeof shippingFeeTN !== "number" ||
+      typeof shippingFeeOther !== "number" ||
+      typeof freeShippingThreshold !== "number"
+    ) {
       return NextResponse.json(
         { success: false, error: "Invalid parameters. Fees must be numbers." },
         { status: 400 }
       );
     }
 
-    if (shippingFee < 0 || freeShippingThreshold < 0) {
+    if (shippingFeeTN < 0 || shippingFeeOther < 0 || freeShippingThreshold < 0) {
       return NextResponse.json(
         { success: false, error: "Parameters cannot be negative." },
         { status: 400 }
@@ -57,9 +65,14 @@ export async function PUT(request: NextRequest) {
 
     await prisma.$transaction([
       prisma.systemSetting.upsert({
-        where: { key: "shipping_fee" },
-        update: { value: String(shippingFee) },
-        create: { key: "shipping_fee", value: String(shippingFee) },
+        where: { key: "shipping_fee_tn" },
+        update: { value: String(shippingFeeTN) },
+        create: { key: "shipping_fee_tn", value: String(shippingFeeTN) },
+      }),
+      prisma.systemSetting.upsert({
+        where: { key: "shipping_fee_other" },
+        update: { value: String(shippingFeeOther) },
+        create: { key: "shipping_fee_other", value: String(shippingFeeOther) },
       }),
       prisma.systemSetting.upsert({
         where: { key: "free_shipping_threshold" },
@@ -71,7 +84,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        shippingFee,
+        shippingFeeTN,
+        shippingFeeOther,
         freeShippingThreshold,
       },
       message: "Settings updated successfully",
@@ -84,3 +98,4 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
+

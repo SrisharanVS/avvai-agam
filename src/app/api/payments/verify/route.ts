@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyRazorpaySignature } from "@/lib/razorpay";
 import { sendInvoiceEmail } from "@/lib/email";
 import { generateInvoicePDFBuffer } from "@/lib/pdf";
+import { calculateShipping } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,7 @@ export async function POST(request: NextRequest) {
         price: true,
         discountedPrice: true,
         stock: true,
+        weight: true,
       },
     });
 
@@ -179,18 +181,27 @@ export async function POST(request: NextRequest) {
         quantity: item.quantity,
         unitPrice,
         total: item.quantity * unitPrice,
+        weight: product.weight,
       };
     });
 
     const settings = await prisma.systemSetting.findMany();
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
-    const shippingFee = parseFloat(settingsMap.get("shipping_fee") ?? "60");
+    const shippingFeeTN = parseFloat(settingsMap.get("shipping_fee_tn") ?? "60");
+    const shippingFeeOther = parseFloat(settingsMap.get("shipping_fee_other") ?? "100");
     const freeShippingThreshold = parseFloat(
       settingsMap.get("free_shipping_threshold") ?? "500"
     );
 
     const subtotal = enrichedItems.reduce((s, i) => s + i.total, 0);
-    const shippingAmount = subtotal >= freeShippingThreshold ? 0 : shippingFee;
+    const shippingAmount = calculateShipping({
+      items: enrichedItems,
+      subtotal,
+      state,
+      shippingFeeTN,
+      shippingFeeOther,
+      freeShippingThreshold,
+    });
     const taxAmount = 0;
     const discountAmount = 0;
     const baseTotal = subtotal + shippingAmount + taxAmount - discountAmount;

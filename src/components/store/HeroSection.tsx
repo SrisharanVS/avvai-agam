@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight, Leaf, ShieldCheck, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,87 +26,100 @@ export default function HeroSection() {
       <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-olive-500/20 rounded-full blur-3xl" />
 
       {/* Content */}
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center">
-        {/* Badge */}
-        {/* <motion.div */}
-        {/* initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 rounded-full px-5 py-2 mb-8"
-        > */}
-        {/* <Leaf className="w-4 h-4 text-primary-200" /> */}
-        {/* <span className="text-primary-100 text-sm font-medium"> */}
-        {/* 100% Organic · No Chemicals · Farm Fresh */}
-        {/* </span> */}
-        {/* </motion.div> */}
-
-        {/* Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1 }}
-          className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight"
-        >
-          Pure Food.
-          <br />
-          <span className="text-amber-400">Naturally</span> Yours.
-        </motion.h1>
-
-        {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.25 }}
-          className="text-primary-100 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed"
-        >
-          Discover the finest organic groceries, cold-pressed oils, ancient millets,
-          and traditional foods sourced directly from certified organic farms.
-        </motion.p>
-
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="flex flex-col sm:flex-row gap-4 justify-center"
-        >
-          <LinkButton
-            href="/shop"
-            className="bg-amber-400 hover:bg-amber-500 text-primary-900 font-bold text-base h-14 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-105"
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          {/* Left Column: Grandma Image */}
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="lg:col-span-5 flex justify-center lg:justify-end order-1"
           >
-            Shop Now
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </LinkButton>
-          <LinkButton
-            href="#categories"
-            variant="outline"
-            className="border-white/40 text-black hover:bg-white/10 hover:border-white/60 font-semibold text-base h-14 px-8 rounded-2xl backdrop-blur-sm"
-          >
-            Explore Categories
-          </LinkButton>
-        </motion.div>
-
-        {/* Trust badges */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.6 }}
-          className="flex flex-wrap items-center justify-center gap-6 mt-14"
-        >
-          {[
-            { icon: ShieldCheck, text: "Certified Organic" },
-            { icon: Leaf, text: "No Pesticides" },
-            { icon: Sprout, text: "Farm Direct" },
-          ].map(({ icon: Icon, text }) => (
-            <div
-              key={text}
-              className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2"
-            >
-              <Icon className="w-4 h-4 text-primary-200" />
-              <span className="text-primary-100 text-sm font-medium">{text}</span>
+            <div className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 lg:w-[420px] lg:h-[420px]">
+              <Image
+                src="/avvai-grandma-removebg-preview.png"
+                alt="Avvai Grandma"
+                fill
+                priority
+                className="object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.2)] filter saturate-[1.05]"
+              />
+              
+              {/* Subtle background glow under the image */}
+              <div className="absolute inset-0 bg-primary-400/20 rounded-full blur-3xl -z-10 scale-90" />
             </div>
-          ))}
-        </motion.div>
+          </motion.div>
+
+          {/* Right Column: Text & Content */}
+          <div className="lg:col-span-7 text-center lg:text-left flex flex-col items-center lg:items-start order-2">
+            {/* Headline */}
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1 }}
+              className="font-display text-5xl sm:text-6xl md:text-7xl lg:text-7xl xl:text-8xl font-bold text-white mb-6 leading-tight"
+            >
+              Pure Food.
+              <br />
+              <span className="text-amber-400">Naturally</span> Yours.
+            </motion.h1>
+
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.25 }}
+              className="text-primary-100 text-lg md:text-xl max-w-2xl lg:max-w-none mb-10 leading-relaxed"
+            >
+              Discover the finest organic groceries, cold-pressed oils, ancient millets,
+              and traditional foods sourced directly from certified organic farms.
+            </motion.p>
+
+            {/* CTA Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start w-full sm:w-auto"
+            >
+              <LinkButton
+                href="/shop"
+                className="bg-amber-400 hover:bg-amber-500 text-primary-900 font-bold text-base h-14 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-105"
+              >
+                Shop Now
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </LinkButton>
+              <LinkButton
+                href="#categories"
+                variant="outline"
+                className="border-white/40 text-black hover:bg-white/10 hover:border-white/60 font-semibold text-base h-14 px-8 rounded-2xl backdrop-blur-sm"
+              >
+                Explore Categories
+              </LinkButton>
+            </motion.div>
+
+            {/* Trust badges */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.6 }}
+              className="flex flex-wrap items-center justify-center lg:justify-start gap-4 mt-14"
+            >
+              {[
+                { icon: ShieldCheck, text: "Certified Organic" },
+                { icon: Leaf, text: "No Pesticides" },
+                { icon: Sprout, text: "Farm Direct" },
+              ].map(({ icon: Icon, text }) => (
+                <div
+                  key={text}
+                  className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2"
+                >
+                  <Icon className="w-4 h-4 text-primary-200" />
+                  <span className="text-primary-100 text-sm font-medium">{text}</span>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </div>
       </div>
 
       {/* Bottom wave */}

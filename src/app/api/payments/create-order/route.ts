@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getRazorpay } from "@/lib/razorpay";
+import { calculateShipping } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function calcTotals(
-  items: Array<{ price: number; quantity: number }>,
-  shippingFee: number,
+  items: Array<{ price: number; quantity: number; weight: string | null }>,
+  state: string | undefined,
+  shippingFeeTN: number,
+  shippingFeeOther: number,
   freeShippingThreshold: number
 ): { subtotal: number; shipping: number; tax: number; gatewayFee: number; total: number } {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const shipping = subtotal >= freeShippingThreshold ? 0 : shippingFee;
+  const shipping = calculateShipping({
+    items,
+    subtotal,
+    state,
+    shippingFeeTN,
+    shippingFeeOther,
+    freeShippingThreshold,
+  });
   const tax = 0;
   const baseTotal = subtotal + shipping + tax;
   const gatewayFee = Math.round(baseTotal * 0.0236 * 100) / 100;
@@ -28,11 +38,13 @@ export async function POST(request: NextRequest) {
       customerName,
       customerEmail,
       customerPhone,
+      state,
     }: {
       items: Array<{ productId: string; quantity: number }>;
       customerName: string;
       customerEmail: string;
       customerPhone: string;
+      state?: string;
     } = body;
 
     // ── 1. Input validation ────────────────────────────────────────────────
@@ -61,6 +73,7 @@ export async function POST(request: NextRequest) {
         discountedPrice: true,
         stock: true,
         active: true,
+        weight: true,
       },
     });
 
@@ -96,19 +109,22 @@ export async function POST(request: NextRequest) {
       const price = product.discountedPrice
         ? Number(product.discountedPrice)
         : Number(product.price);
-      return { ...item, price, productName: product.name };
+      return { ...item, price, productName: product.name, weight: product.weight };
     });
 
     const settings = await prisma.systemSetting.findMany();
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
-    const shippingFee = parseFloat(settingsMap.get("shipping_fee") ?? "60");
+    const shippingFeeTN = parseFloat(settingsMap.get("shipping_fee_tn") ?? "60");
+    const shippingFeeOther = parseFloat(settingsMap.get("shipping_fee_other") ?? "100");
     const freeShippingThreshold = parseFloat(
       settingsMap.get("free_shipping_threshold") ?? "500"
     );
 
     const { subtotal, shipping, tax, gatewayFee, total } = calcTotals(
       enrichedItems,
-      shippingFee,
+      state,
+      shippingFeeTN,
+      shippingFeeOther,
       freeShippingThreshold
     );
     const amountInPaise = Math.round(total * 100);

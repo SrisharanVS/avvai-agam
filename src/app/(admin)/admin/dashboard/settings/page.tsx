@@ -6,7 +6,8 @@ import { Save, Loader2, Info } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
-  const [shippingFee, setShippingFee] = useState<number>(60);
+  const [shippingFeeTN, setShippingFeeTN] = useState<number>(60);
+  const [shippingFeeOther, setShippingFeeOther] = useState<number>(100);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState<number>(500);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -16,8 +17,9 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((resData) => {
         if (resData.success) {
-          setShippingFee(resData.data.shippingFee);
-          setFreeShippingThreshold(resData.data.freeShippingThreshold);
+          setShippingFeeTN(resData.data.shippingFeeTN ?? 60);
+          setShippingFeeOther(resData.data.shippingFeeOther ?? 100);
+          setFreeShippingThreshold(resData.data.freeShippingThreshold ?? 500);
         } else {
           toast.error(resData.error || "Failed to load settings");
         }
@@ -40,7 +42,8 @@ export default function SettingsPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shippingFee,
+          shippingFeeTN,
+          shippingFeeOther,
           freeShippingThreshold,
         }),
       });
@@ -88,32 +91,54 @@ export default function SettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label
-                  htmlFor="shipping-fee"
+                  htmlFor="shipping-fee-tn"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Standard Shipping Fee (₹)
+                  Tamil Nadu Shipping Fee (₹/kg)
                 </label>
                 <input
-                  id="shipping-fee"
+                  id="shipping-fee-tn"
                   type="number"
                   min="0"
                   step="0.01"
                   required
-                  value={shippingFee}
-                  onChange={(e) => setShippingFee(parseFloat(e.target.value) || 0)}
+                  value={shippingFeeTN}
+                  onChange={(e) => setShippingFeeTN(parseFloat(e.target.value) || 0)}
                   className="w-full h-11 px-3.5 rounded-xl border border-cream-300 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50/50 text-sm font-medium text-gray-800"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Applied to orders below the free shipping threshold.
+                  Per-kg rate for orders to Tamil Nadu below the free threshold.
                 </p>
               </div>
 
               <div className="space-y-2">
                 <label
+                  htmlFor="shipping-fee-other"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Other States Shipping Fee (₹/kg)
+                </label>
+                <input
+                  id="shipping-fee-other"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={shippingFeeOther}
+                  onChange={(e) => setShippingFeeOther(parseFloat(e.target.value) || 0)}
+                  className="w-full h-11 px-3.5 rounded-xl border border-cream-300 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50/50 text-sm font-medium text-gray-800"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Flat per-kg rate for orders outside Tamil Nadu.
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label
                   htmlFor="free-shipping-threshold"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Free Shipping Threshold (₹)
+                  Free Shipping Threshold (₹) (Tamil Nadu Only)
                 </label>
                 <input
                   id="free-shipping-threshold"
@@ -126,7 +151,7 @@ export default function SettingsPage() {
                   className="w-full h-11 px-3.5 rounded-xl border border-cream-300 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50/50 text-sm font-medium text-gray-800"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Orders equal or above this subtotal amount get free shipping.
+                  Orders to Tamil Nadu equal to or above this subtotal get free shipping.
                 </p>
               </div>
             </div>

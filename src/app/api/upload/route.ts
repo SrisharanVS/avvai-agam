@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const extension = file.name.split(".").pop() || "jpg";
     const filename = `products/${nanoid()}.${extension}`;
 
-    const blob = await put(filename, file, { access: "public" });
+    const blob = await put(filename, file, { access: "private" });
 
     return NextResponse.json({ success: true, url: blob.url });
   } catch (error) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { put } from "@vercel/blob";
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,13 +41,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { put } = await import("@vercel/blob");
-    const { nanoid } = await import("nanoid");
-    const extension = file.name.split(".").pop() || "jpg";
-    const filename = `products/${nanoid()}.${extension}`;
-
-    const blob = await put(filename, file, { access: "private" });
-
+    const blob = await put(`/products/${file.name}`, file, { access: "public" });
     return NextResponse.json({ success: true, url: blob.url });
   } catch (error) {
     console.error("Upload error:", error);

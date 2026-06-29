@@ -3,9 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyRazorpaySignature } from "@/lib/razorpay";
 import { sendInvoiceEmail } from "@/lib/email";
 import { generateInvoicePDFBuffer } from "@/lib/pdf";
-import { calculateShipping } from "@/lib/utils";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+import { calculateShipping, ceilShippingWeight } from "@/lib/utils";
 
 function generateOrderNumber(): string {
   const date = new Date();
@@ -19,8 +17,6 @@ function generateInvoiceNumber(orderNumber: string): string {
   return `INV-${orderNumber.split("-")[1] || Date.now()}-${random}`;
 }
 
-// ─── Route Handler ────────────────────────────────────────────────────────────
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -29,17 +25,8 @@ export async function POST(request: NextRequest) {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      // Customer data (re-validated server side against the Payment record)
-      customerName,
-      customerEmail,
-      customerPhone,
-      address,
-      city,
-      state,
-      pincode,
-      landmark,
-      deliveryNotes,
-      // Cart (product IDs + quantities only — prices re-fetched from DB)
+      customerName, customerEmail, customerPhone,
+      address, city, state, pincode, landmark, deliveryNotes,
       items,
     }: {
       razorpay_order_id: string;
@@ -54,17 +41,12 @@ export async function POST(request: NextRequest) {
       pincode: string;
       landmark?: string;
       deliveryNotes?: string;
-      items: Array<{ productId: string; quantity: number }>;
+      items: Array<{ variantId: string; quantity: number }>;
     } = body;
 
-    // ── 1. Basic input validation ──────────────────────────────────────────
     if (
-      !razorpay_order_id ||
-      !razorpay_payment_id ||
-      !razorpay_signature ||
-      !customerName ||
-      !customerEmail ||
-      !items?.length
+      !razorpay_order_id || !razorpay_payment_id || !razorpay_signature ||
+      !customerName || !customerEmail || !items?.length
     ) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
@@ -72,7 +54,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 2. Idempotency check — reject duplicates ───────────────────────────
+    // Idempotency check
     const existingPayment = await prisma.payment.findUnique({
       where: { razorpayOrderId: razorpay_order_id },
     });
@@ -85,7 +67,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingPayment.status === "SUCCESS") {
-      // Payment already processed — return the existing order info
       const order = existingPayment.orderId
         ? await prisma.order.findUnique({
           where: { id: existingPayment.orderId },
@@ -108,7 +89,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 3. HMAC Signature Verification ────────────────────────────────────
+    // HMAC Signature Verification
     let signatureValid = false;
     try {
       signatureValid = verifyRazorpaySignature({
@@ -124,45 +105,36 @@ export async function POST(request: NextRequest) {
     }
 
     if (!signatureValid) {
-      // Mark payment as failed on invalid signature
       await prisma.payment.update({
         where: { razorpayOrderId: razorpay_order_id },
         data: { status: "FAILED", razorpayPaymentId: razorpay_payment_id },
       });
-
       return NextResponse.json(
         { success: false, error: "Invalid payment signature. Payment not verified." },
         { status: 400 }
       );
     }
 
-    // ── 4. Re-fetch product prices & validate stock ────────────────────────
-    const productIds = items.map((i) => i.productId).filter(Boolean);
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds } },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        discountedPrice: true,
-        stock: true,
-        weight: true,
-      },
+    // Re-fetch variant prices & validate stock
+    const variantIds = items.map((i) => i.variantId).filter(Boolean);
+    const variants = await prisma.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      include: { product: { select: { id: true, name: true } } },
     });
 
     for (const item of items) {
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) {
+      const variant = variants.find((v) => v.id === item.variantId);
+      if (!variant) {
         return NextResponse.json(
-          { success: false, error: `Product not found: ${item.productId}` },
+          { success: false, error: `Variant not found: ${item.variantId}` },
           { status: 400 }
         );
       }
-      if (product.stock < item.quantity) {
+      if (variant.stock < item.quantity) {
         return NextResponse.json(
           {
             success: false,
-            error: `Insufficient stock for "${product.name}". Available: ${product.stock}`,
+            error: `Insufficient stock for "${variant.product.name} — ${variant.variantName}". Available: ${variant.stock}`,
           },
           { status: 400 }
         );
@@ -171,17 +143,21 @@ export async function POST(request: NextRequest) {
 
     // Re-compute totals server-side
     const enrichedItems = items.map((item) => {
-      const product = products.find((p) => p.id === item.productId)!;
-      const unitPrice = product.discountedPrice
-        ? Number(product.discountedPrice)
-        : Number(product.price);
+      const variant = variants.find((v) => v.id === item.variantId)!;
+      const unitPrice = Number(variant.sellingPrice);
       return {
-        productId: item.productId,
-        productName: product.name,
+        variantId: item.variantId,
+        productId: variant.productId,
+        productName: variant.product.name,
+        variantName: variant.variantName,
         quantity: item.quantity,
         unitPrice,
         total: item.quantity * unitPrice,
-        weight: product.weight,
+        shippingWeight: Number(variant.shippingWeight),
+        sku: variant.sku,
+        quantityValue: Number(variant.quantityValue),
+        unit: variant.unit,
+        customUnit: variant.customUnit,
       };
     });
 
@@ -208,37 +184,31 @@ export async function POST(request: NextRequest) {
     const gatewayFee = Math.round(baseTotal * 0.0236 * 100) / 100;
     const totalAmount = baseTotal + gatewayFee;
 
-    // ── 5. Prisma Transaction: create Order, Items, Inventory, Invoice, Payment ──
     const orderNumber = generateOrderNumber();
     const invoiceNumber = generateInvoiceNumber(orderNumber);
 
     const { order, invoice } = await prisma.$transaction(async (tx) => {
-      // 5a. Create Order (CONFIRMED + PAID for Razorpay)
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
-          customerName,
-          customerEmail,
-          customerPhone,
-          address,
-          city,
-          state,
-          pincode,
+          customerName, customerEmail, customerPhone,
+          address, city, state, pincode,
           landmark: landmark || null,
           deliveryNotes: deliveryNotes || null,
-          subtotal,
-          taxAmount,
-          shippingAmount,
-          discountAmount,
-          gatewayFee,
-          totalAmount,
+          subtotal, taxAmount, shippingAmount, discountAmount, gatewayFee, totalAmount,
           paymentMethod: "RAZORPAY",
           paymentStatus: "PAID",
           orderStatus: "CONFIRMED",
           items: {
             create: enrichedItems.map((i) => ({
               productId: i.productId,
+              variantId: i.variantId,
               productName: i.productName,
+              variantNameSnapshot: i.variantName,
+              quantityValueSnapshot: i.quantityValue,
+              unitSnapshot: i.unit,
+              customUnitSnapshot: i.customUnit || null,
+              skuSnapshot: i.sku || null,
               quantity: i.quantity,
               unitPrice: i.unitPrice,
               total: i.total,
@@ -248,20 +218,21 @@ export async function POST(request: NextRequest) {
         include: { items: true },
       });
 
-      // 5b. Reduce stock + create InventoryMovement for each item
+      // Deduct variant stock + record inventory movements
       for (const item of enrichedItems) {
-        const product = products.find((p) => p.id === item.productId)!;
-        const previousStock = product.stock;
+        const variant = variants.find((v) => v.id === item.variantId)!;
+        const previousStock = variant.stock;
         const newStock = Math.max(0, previousStock - item.quantity);
 
-        await tx.product.update({
-          where: { id: item.productId },
+        await tx.productVariant.update({
+          where: { id: item.variantId },
           data: { stock: newStock },
         });
 
         await tx.inventoryMovement.create({
           data: {
             productId: item.productId,
+            variantId: item.variantId,
             movementType: "SALE",
             quantity: -item.quantity,
             previousStock,
@@ -273,30 +244,31 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // 5c. Create Invoice (PAID for Razorpay)
+      // Create Invoice (PAID)
       const newInvoice = await tx.invoice.create({
         data: {
           invoiceNumber,
           type: "ECOMMERCE",
           orderId: newOrder.id,
-          customerName,
-          customerEmail,
+          customerName, customerEmail,
           customerPhone: customerPhone || null,
           billingAddress: `${address}, ${city}, ${state} - ${pincode}`,
-          subtotal,
-          taxAmount,
-          taxRate: 0,
-          discountAmount,
-          shippingAmount,
-          gatewayFee,
-          totalAmount,
+          subtotal, taxAmount, taxRate: 0, discountAmount, shippingAmount, gatewayFee, totalAmount,
           paymentMethod: "RAZORPAY",
           status: "PAID",
           items: {
             create: enrichedItems.map((i) => ({
+              productId: i.productId,
+              variantId: i.variantId,
               productName: i.productName,
+              variantNameSnapshot: i.variantName,
+              quantityValueSnapshot: i.quantityValue,
+              unitSnapshot: i.unit,
+              customUnitSnapshot: i.customUnit || null,
+              skuSnapshot: i.sku || null,
               quantity: i.quantity,
               unitPrice: i.unitPrice,
+              unitPriceSnapshot: i.unitPrice,
               taxRate: 0,
               taxAmount: 0,
               total: i.total,
@@ -306,7 +278,7 @@ export async function POST(request: NextRequest) {
         include: { items: true },
       });
 
-      // 5d. Update Payment record — link orderId, mark SUCCESS
+      // Update Payment record — link orderId, mark SUCCESS
       await tx.payment.update({
         where: { razorpayOrderId: razorpay_order_id },
         data: {
@@ -320,7 +292,13 @@ export async function POST(request: NextRequest) {
       return { order: newOrder, invoice: newInvoice };
     });
 
-    // ── 6. Generate PDF and send invoice email (async, non-blocking) ───────
+    // PDF + email (non-blocking)
+    const totalWeightKg = enrichedItems.reduce(
+      (s, i) => s + i.shippingWeight * i.quantity,
+      0
+    );
+    const billableWeight = ceilShippingWeight(totalWeightKg);
+
     (async () => {
       try {
         const pdfData = {
@@ -336,12 +314,11 @@ export async function POST(request: NextRequest) {
           gatewayFee: Number(invoice.gatewayFee),
           totalAmount: Number(invoice.totalAmount),
           paymentMethod: "RAZORPAY",
-          notes:
-            "Thank you for shopping with Avvai Natural Foods! Your payment was received and your organic products will be delivered soon.",
+          notes: `Thank you for shopping with Avvai Natural Foods! Items weight: ${totalWeightKg.toFixed(2)} kg | Shipping charged for: ${billableWeight} kg`,
           createdAt: invoice.createdAt,
           items: invoice.items.map((i) => ({
             productName: i.productName,
-            description: null,
+            description: i.variantNameSnapshot || null,
             quantity: i.quantity,
             unitPrice: Number(i.unitPrice),
             taxRate: Number(i.taxRate),
@@ -349,9 +326,7 @@ export async function POST(request: NextRequest) {
             total: Number(i.total),
           })),
         };
-
         const pdfBuffer = await generateInvoicePDFBuffer(pdfData);
-
         await sendInvoiceEmail({
           to: customerEmail,
           customerName,
@@ -365,7 +340,6 @@ export async function POST(request: NextRequest) {
       }
     })();
 
-    // ── 7. Respond with success ────────────────────────────────────────────
     return NextResponse.json({
       success: true,
       orderId: order.id,

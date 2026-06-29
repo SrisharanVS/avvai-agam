@@ -22,19 +22,50 @@ export function ProductCombobox({
     const res = await fetch(`/api/products?limit=50&search=${encodeURIComponent(query)}`);
     const data = await res.json();
     if (data.success) {
-      return data.data;
+      const items: any[] = [];
+      data.data.forEach((p: any) => {
+        if (p.variants && p.variants.length > 0) {
+          p.variants.forEach((v: any) => {
+            const hasMultipleVariants = p.variants.length > 1 || v.variantName !== "Default";
+            items.push({
+              id: p.id,
+              variantId: v.id,
+              name: hasMultipleVariants ? `${p.name} — ${v.variantName}` : p.name,
+              sku: v.sku,
+              price: v.sellingPrice,
+              costPrice: v.costPrice ?? 0,
+              unit: v.customUnit || v.unit || "units",
+              defaultTaxRate: p.defaultTaxRate,
+              description: p.description,
+            });
+          });
+        } else {
+          items.push({
+            id: p.id,
+            variantId: null,
+            name: p.name,
+            sku: null,
+            price: 0,
+            costPrice: 0,
+            unit: "units",
+            defaultTaxRate: p.defaultTaxRate,
+            description: p.description,
+          });
+        }
+      });
+      return items;
     }
     return [];
   }, []);
 
-  const renderItem = (product: any) => (
+  const renderItem = (item: any) => (
     <div className="flex flex-col">
-      <span className="font-semibold text-gray-800">{product.name}</span>
-      <span className="text-xs font-mono text-muted-foreground">{product.sku || "NO-SKU"}</span>
+      <span className="font-semibold text-gray-800">{item.name}</span>
+      <span className="text-xs font-mono text-muted-foreground">{item.sku || "NO-SKU"}</span>
     </div>
   );
 
-  const getDisplayValue = (product: any) => product.name;
+  const getDisplayValue = (item: any) => item.name;
 
   return (
     <AutocompleteCombobox

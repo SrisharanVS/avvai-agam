@@ -1,6 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const VARIANT_SELECT = {
+  id: true,
+  sku: true,
+  variantName: true,
+  quantityValue: true,
+  unit: true,
+  customUnit: true,
+  sellingPrice: true,
+  costPrice: true,
+  stock: true,
+  shippingWeight: true,
+  barcode: true,
+  active: true,
+  isDefault: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+function formatVariants(variants: any[]) {
+  return variants.map((v) => ({
+    ...v,
+    quantityValue: Number(v.quantityValue),
+    sellingPrice: Number(v.sellingPrice),
+    costPrice: v.costPrice ? Number(v.costPrice) : null,
+    shippingWeight: Number(v.shippingWeight),
+  }));
+}
+
+function computeProductMeta(variants: any[]) {
+  const activeVariants = variants.filter((v) => v.active);
+  const prices = activeVariants.map((v) => v.sellingPrice);
+  return {
+    minPrice: prices.length ? Math.min(...prices) : 0,
+    maxPrice: prices.length ? Math.max(...prices) : 0,
+    variantCount: activeVariants.length,
+    totalStock: activeVariants.reduce((s, v) => s + v.stock, 0),
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,84 +51,39 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const featured = searchParams.get("featured");
     const inStock = searchParams.get("inStock");
-    const minPrice = searchParams.get("minPrice");
-    const maxPrice = searchParams.get("maxPrice");
     const sort = searchParams.get("sort") || "newest";
 
-    const where: any = {};
+    const where: any = { active: true };
 
-    // Category filter
     if (category) {
-      where.category = {
-        slug: category,
-      };
+      where.category = { slug: category };
     }
 
-    // Featured filter
     if (featured === "true") {
       where.featured = true;
     }
 
-    // Stock filter
-    if (inStock === "true") {
-      where.stock = {
-        gt: 0,
-      };
-    }
-
-    // Search filter
     if (search) {
       where.OR = [
-        {
-          name: {
-            contains: search,
-            mode: "insensitive",
-          },
-        },
-        {
-          sku: {
-            contains: search,
-            mode: "insensitive",
-          },
-        },
-        {
-          description: {
-            contains: search,
-            mode: "insensitive",
-          },
-        },
-        {
-          tags: {
-            has: search,
-          },
-        },
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { tags: { has: search } },
+        { variants: { some: { sku: { contains: search, mode: "insensitive" } } } },
       ];
     }
 
-    // Price filter
-    if (minPrice || maxPrice) {
-      where.price = {};
-
-      if (minPrice) {
-        where.price.gte = parseFloat(minPrice);
-      }
-
-      if (maxPrice) {
-        where.price.lte = parseFloat(maxPrice);
-      }
+    // inStock filter — at least one variant with stock > 0
+    if (inStock === "true") {
+      where.variants = { some: { stock: { gt: 0 }, active: true } };
     }
 
-    // Sorting
     const orderBy =
-      sort === "price_asc"
-        ? { price: "asc" as const }
-        : sort === "price_desc"
-          ? { price: "desc" as const }
-          : sort === "rating"
-            ? { rating: "desc" as const }
-            : sort === "popular"
-              ? { reviewCount: "desc" as const }
-              : { createdAt: "desc" as const };
+      sort === "rating"
+        ? { rating: "desc" as const }
+        : sort === "popular"
+          ? { reviewCount: "desc" as const }
+          : { createdAt: "desc" as const };
+
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
@@ -97,30 +91,27 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
-          },
+          category: { select: { id: true, name: true, slug: true } },
+          variants: { where: { active: true }, select: VARIANT_SELECT, orderBy: { sellingPrice: "asc" } },
         },
       }),
-
-      prisma.product.count({
-        where,
-      }),
+      prisma.product.count({ where }),
     ]);
 
-    // Convert Decimal values to numbers
-    const formatted = products.map((p) => ({
-      ...p,
-      price: Number(p.price),
-      discountedPrice: p.discountedPrice
-        ? Number(p.discountedPrice)
-        : null,
-      rating: Number(p.rating),
-    }));
+    const formatted = products.map((p) => {
+      const variants = formatVariants(p.variants);
+      return {
+        ...p,
+        rating: Number(p.rating),
+        defaultTaxRate: Number(p.defaultTaxRate),
+        variants,
+        ...computeProductMeta(variants),
+      };
+    });
+
+    // Sort by price if needed (on minPrice)
+    if (sort === "price_asc") formatted.sort((a, b) => a.minPrice - b.minPrice);
+    if (sort === "price_desc") formatted.sort((a, b) => b.minPrice - a.minPrice);
 
     return NextResponse.json({
       success: true,
@@ -134,15 +125,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Products GET error:", error);
-
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch products",
-      },
-      {
-        status: 500,
-      }
+      { success: false, error: "Failed to fetch products" },
+      { status: 500 }
     );
   }
 }
@@ -156,51 +141,29 @@ export async function POST(request: NextRequest) {
       slug,
       description,
       categoryId,
-      price,
-      discountedPrice,
-      stock,
       imageUrls,
       featured,
       nutritionInfo,
       ingredients,
       benefits,
-      weight,
       tags,
-      sku,
-      unit,
       defaultTaxRate,
       active,
+      variants: variantInputs,
     } = body;
 
-    // Validation
-    if (!name || !categoryId || !price) {
+    if (!name || !categoryId) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Name, category, and price are required",
-        },
-        {
-          status: 400,
-        }
+        { success: false, error: "Name and category are required" },
+        { status: 400 }
       );
     }
 
-    // Sequence Generator for sku (PROD-XXXXXX)
-    let finalSku = sku;
-    if (!finalSku) {
-      const latestProduct = await prisma.product.findFirst({
-        orderBy: { sku: "desc" },
-        where: { sku: { startsWith: "PROD-" } }
-      });
-      let nextNum = 1;
-      if (latestProduct && latestProduct.sku) {
-        const parts = latestProduct.sku.split("-");
-        const num = parseInt(parts[1], 10);
-        if (!isNaN(num)) {
-          nextNum = num + 1;
-        }
-      }
-      finalSku = `PROD-${String(nextNum).padStart(6, "0")}`;
+    if (!variantInputs || variantInputs.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "At least one variant is required" },
+        { status: 400 }
+      );
     }
 
     const generatedSlug =
@@ -210,66 +173,88 @@ export async function POST(request: NextRequest) {
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9-]/g, "");
 
-    const product = await prisma.product.create({
-      data: {
-        name,
-        slug: generatedSlug,
-        description,
-        categoryId,
-        price,
-        discountedPrice: discountedPrice || null,
-        stock: stock || 0,
-        imageUrls: imageUrls || [],
-        featured: featured || false,
-        nutritionInfo,
-        ingredients,
-        benefits,
-        weight,
-        tags: tags || [],
-        sku: finalSku,
-        unit: unit || "units",
-        defaultTaxRate: defaultTaxRate || 0,
-        active: active !== undefined ? active : true,
-      },
+    // Generate base SKU for product
+    const latestVariant = await prisma.productVariant.findFirst({
+      where: { sku: { startsWith: "PROD-" } },
+      orderBy: { sku: "desc" },
+    });
+    let nextNum = 1;
+    if (latestVariant?.sku) {
+      const parts = latestVariant.sku.split("-");
+      const num = parseInt(parts[1], 10);
+      if (!isNaN(num)) nextNum = num + 1;
+    }
+    const baseSku = `PROD-${String(nextNum).padStart(6, "0")}`;
 
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
+    const product = await prisma.$transaction(async (tx) => {
+      const newProduct = await tx.product.create({
+        data: {
+          name,
+          slug: generatedSlug,
+          description,
+          categoryId,
+          imageUrls: imageUrls || [],
+          featured: featured || false,
+          nutritionInfo,
+          ingredients,
+          benefits,
+          tags: tags || [],
+          defaultTaxRate: defaultTaxRate || 0,
+          active: active !== undefined ? active : true,
         },
-      },
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+        },
+      });
+
+      // Create variants
+      const variantData = variantInputs.map((v: any, idx: number) => ({
+        productId: newProduct.id,
+        sku: v.sku || `${baseSku}-${String.fromCharCode(65 + idx)}`,
+        variantName: v.variantName,
+        quantityValue: parseFloat(v.quantityValue) || 1,
+        unit: v.unit || "GRAM",
+        customUnit: v.customUnit || null,
+        sellingPrice: parseFloat(v.sellingPrice) || 0,
+        costPrice: v.costPrice ? parseFloat(v.costPrice) : null,
+        stock: parseInt(v.stock) || 0,
+        shippingWeight: parseFloat(v.shippingWeight) || 1,
+        active: v.active !== false,
+        isDefault: idx === 0 || v.isDefault === true,
+      }));
+
+      await tx.productVariant.createMany({ data: variantData });
+
+      return tx.product.findUnique({
+        where: { id: newProduct.id },
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          variants: { select: VARIANT_SELECT, orderBy: { sellingPrice: "asc" } },
+        },
+      });
     });
 
+    if (!product) throw new Error("Product creation failed");
+
+    const variants = formatVariants(product.variants);
     return NextResponse.json(
       {
         success: true,
-
         data: {
           ...product,
-          price: Number(product.price),
-          discountedPrice: product.discountedPrice
-            ? Number(product.discountedPrice)
-            : null,
+          rating: Number(product.rating),
+          defaultTaxRate: Number(product.defaultTaxRate),
+          variants,
+          ...computeProductMeta(variants),
         },
       },
-      {
-        status: 201,
-      }
+      { status: 201 }
     );
   } catch (error) {
     console.error("Product POST error:", error);
-
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to create product",
-      },
-      {
-        status: 500,
-      }
+      { success: false, error: "Failed to create product" },
+      { status: 500 }
     );
   }
 }

@@ -26,17 +26,26 @@ export async function GET(_request: NextRequest) {
       prisma.purchaseOrder.count({
         where: { status: { in: ["DRAFT", "SENT", "PARTIALLY_RECEIVED"] } },
       }),
-      prisma.$queryRaw<Array<{ id: string; name: string; stock: number; minimumStockLevel: number }>>`
-        SELECT id, name, stock, "minimumStockLevel"
-        FROM products
-        WHERE "minimumStockLevel" > 0
-          AND stock <= "minimumStockLevel"
-        ORDER BY stock ASC
-        LIMIT 10
-      `,
+      prisma.product.findMany({
+        where: {
+          active: true,
+          variants: {
+            some: {
+              active: true,
+              stock: { lte: 10 },
+            },
+          },
+        },
+        include: {
+          variants: {
+            where: { active: true },
+          },
+        },
+        take: 10,
+      }),
       prisma.$queryRaw<[{ total: number }]>`
-        SELECT COALESCE(SUM(stock * COALESCE("costPrice", price)), 0)::float AS total
-        FROM products
+        SELECT COALESCE(SUM(stock * COALESCE("costPrice", "sellingPrice")), 0)::float AS total
+        FROM product_variants
       `,
     ]);
 
@@ -52,12 +61,15 @@ export async function GET(_request: NextRequest) {
         lowStockCount,
         pendingPOCount,
         inventoryValue,
-        lowStockProducts: lowStockProducts.map((p) => ({
-          id: p.id,
-          name: p.name,
-          stock: Number(p.stock),
-          minimumStockLevel: Number(p.minimumStockLevel),
-        })),
+        lowStockProducts: lowStockProducts.map((p) => {
+          const totalStock = p.variants.reduce((acc, v) => acc + v.stock, 0);
+          return {
+            id: p.id,
+            name: p.name,
+            totalStock,
+            variantCount: p.variants.length,
+          };
+        }),
         recentOrders: recentOrders.map((o) => ({
           ...o,
           subtotal: Number(o.subtotal),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendInvoiceEmail } from "@/lib/email";
 import { generateInvoicePDFBuffer } from "@/lib/pdf";
-import { calculateShipping } from "@/lib/utils";
+import { calculateShipping, ceilShippingWeight } from "@/lib/utils";
 
 function generateOrderNumber(): string {
   const date = new Date();
@@ -19,11 +19,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const paymentStatus = searchParams.get("paymentStatus");
 
-    // Build where clause dynamically to support both filters
     const where: { orderStatus?: string; paymentStatus?: string } = {};
     if (status) where.orderStatus = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
-
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
@@ -50,6 +48,9 @@ export async function GET(request: NextRequest) {
           ...i,
           unitPrice: Number(i.unitPrice),
           total: Number(i.total),
+          quantityValueSnapshot: i.quantityValueSnapshot
+            ? Number(i.quantityValueSnapshot)
+            : null,
         })),
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
@@ -79,22 +80,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate stock and compute totals
-    const productIds = items.map((i: { productId: string }) => i.productId).filter(Boolean);
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds } },
+    // Validate stock on ProductVariant
+    const variantIds = items
+      .map((i: any) => i.variantId)
+      .filter(Boolean);
+
+    const variants = await prisma.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      include: { product: { select: { id: true, name: true } } },
     });
 
     for (const item of items) {
-      const product = products.find((p) => p.id === item.productId);
-      if (product && product.stock < item.quantity) {
+      const variant = variants.find((v) => v.id === item.variantId);
+      if (variant && variant.stock < item.quantity) {
         return NextResponse.json(
-          { success: false, error: `Insufficient stock for ${product.name}` },
+          {
+            success: false,
+            error: `Insufficient stock for ${variant.product.name} — ${variant.variantName}`,
+          },
           { status: 400 }
         );
       }
     }
 
+    // Load shipping settings
     const settings = await prisma.systemSetting.findMany();
     const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
     const shippingFeeTN = parseFloat(settingsMap.get("shipping_fee_tn") ?? "60");
@@ -103,19 +112,20 @@ export async function POST(request: NextRequest) {
       settingsMap.get("free_shipping_threshold") ?? "500"
     );
 
+    // Build enriched items with numeric shippingWeight per variant
+    const itemsWithWeight = items.map((item: any) => {
+      const variant = variants.find((v) => v.id === item.variantId);
+      return {
+        ...item,
+        shippingWeight: variant ? Number(variant.shippingWeight) : 1,
+      };
+    });
+
     const subtotal = items.reduce(
       (sum: number, i: { quantity: number; unitPrice: number }) =>
         sum + i.quantity * i.unitPrice,
       0
     );
-
-    const itemsWithWeight = items.map((item: any) => {
-      const product = products.find((p) => p.id === item.productId);
-      return {
-        ...item,
-        weight: product?.weight ?? null,
-      };
-    });
 
     const shippingAmount = calculateShipping({
       items: itemsWithWeight,
@@ -125,6 +135,7 @@ export async function POST(request: NextRequest) {
       shippingFeeOther,
       freeShippingThreshold,
     });
+
     const taxAmount = 0;
     const discountAmount = 0;
     const gatewayFee = 0;
@@ -154,51 +165,58 @@ export async function POST(request: NextRequest) {
           paymentMethod: paymentMethod || "COD",
           couponCode: couponCode || null,
           items: {
-            create: items.map((i: {
-              productId?: string;
-              productName: string;
-              quantity: number;
-              unitPrice: number;
-            }) => ({
-              productId: i.productId || null,
-              productName: i.productName,
-              quantity: i.quantity,
-              unitPrice: i.unitPrice,
-              total: i.quantity * i.unitPrice,
-            })),
+            create: items.map((i: any) => {
+              const variant = variants.find((v) => v.id === i.variantId);
+              return {
+                productId: variant?.product?.id || null,
+                variantId: i.variantId || null,
+                productName: i.productName,
+                variantNameSnapshot: variant?.variantName || null,
+                quantityValueSnapshot: variant
+                  ? Number(variant.quantityValue)
+                  : null,
+                unitSnapshot: variant?.unit || null,
+                customUnitSnapshot: variant?.customUnit || null,
+                skuSnapshot: variant?.sku || null,
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+                total: i.quantity * i.unitPrice,
+              };
+            }),
           },
         },
         include: { items: true },
       });
 
-      // Reduce stock and record inventory movements
+      // Deduct stock from ProductVariant and record movements
       for (const item of items) {
-        if (item.productId) {
-          const product = products.find((p) => p.id === item.productId);
-          const previousStock = product?.stock ?? 0;
-          const newStock = Math.max(0, previousStock - item.quantity);
+        const variant = variants.find((v) => v.id === item.variantId);
+        if (!variant) continue;
 
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: newStock },
-          });
+        const previousStock = variant.stock;
+        const newStock = Math.max(0, previousStock - item.quantity);
 
-          await tx.inventoryMovement.create({
-            data: {
-              productId: item.productId,
-              movementType: "SALE",
-              quantity: -item.quantity,
-              previousStock,
-              newStock,
-              referenceType: "ORDER",
-              referenceId: newOrder.id,
-              notes: `Sale — Order ${orderNumber}`,
-            },
-          });
-        }
+        await tx.productVariant.update({
+          where: { id: variant.id },
+          data: { stock: newStock },
+        });
+
+        await tx.inventoryMovement.create({
+          data: {
+            productId: variant.productId,
+            variantId: variant.id,
+            movementType: "SALE",
+            quantity: -item.quantity,
+            previousStock,
+            newStock,
+            referenceType: "ORDER",
+            referenceId: newOrder.id,
+            notes: `Sale — Order ${orderNumber}`,
+          },
+        });
       }
 
-      // Auto-generate invoice associated with this order
+      // Auto-generate invoice
       const invoiceNumber = `INV-${orderNumber.split("-")[1] || Date.now()}-${Math.floor(Math.random() * 9000) + 1000}`;
       const newInvoice = await tx.invoice.create({
         data: {
@@ -219,18 +237,27 @@ export async function POST(request: NextRequest) {
           paymentMethod: paymentMethod || "COD",
           status: "SENT",
           items: {
-            create: items.map((i: {
-              productName: string;
-              quantity: number;
-              unitPrice: number;
-            }) => ({
-              productName: i.productName,
-              quantity: i.quantity,
-              unitPrice: i.unitPrice,
-              taxRate: 0,
-              taxAmount: 0,
-              total: i.quantity * i.unitPrice,
-            })),
+            create: items.map((i: any) => {
+              const variant = variants.find((v) => v.id === i.variantId);
+              return {
+                productId: variant?.productId || null,
+                variantId: i.variantId || null,
+                productName: i.productName,
+                variantNameSnapshot: variant?.variantName || null,
+                quantityValueSnapshot: variant
+                  ? Number(variant.quantityValue)
+                  : null,
+                unitSnapshot: variant?.unit || null,
+                customUnitSnapshot: variant?.customUnit || null,
+                skuSnapshot: variant?.sku || null,
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+                unitPriceSnapshot: i.unitPrice,
+                taxRate: 0,
+                taxAmount: 0,
+                total: i.quantity * i.unitPrice,
+              };
+            }),
           },
         },
         include: { items: true },
@@ -239,7 +266,14 @@ export async function POST(request: NextRequest) {
       return { order: newOrder, invoice: newInvoice };
     });
 
-    // Generate the PDF buffer and send invoice email (non-blocking)
+    // Email invoice (non-blocking)
+    const totalWeightKg = itemsWithWeight.reduce(
+      (s: number, i: { shippingWeight: number; quantity: number }) =>
+        s + i.shippingWeight * i.quantity,
+      0
+    );
+    const billableWeight = ceilShippingWeight(totalWeightKg);
+
     (async () => {
       try {
         const pdfData = {
@@ -255,11 +289,11 @@ export async function POST(request: NextRequest) {
           gatewayFee: Number(invoice.gatewayFee),
           totalAmount: Number(invoice.totalAmount),
           paymentMethod: invoice.paymentMethod,
-          notes: "Thank you for shopping with Avvai Natural Foods! Your organic products will be delivered soon.",
+          notes: `Thank you for shopping with Avvai Natural Foods! Items weight: ${totalWeightKg.toFixed(2)} kg | Shipping charged for: ${billableWeight} kg`,
           createdAt: invoice.createdAt,
           items: invoice.items.map((i) => ({
             productName: i.productName,
-            description: null,
+            description: i.variantNameSnapshot || null,
             quantity: i.quantity,
             unitPrice: Number(i.unitPrice),
             taxRate: Number(i.taxRate),
@@ -269,13 +303,11 @@ export async function POST(request: NextRequest) {
         };
 
         const pdfBuffer = await generateInvoicePDFBuffer(pdfData);
-
-        // Send email with attached invoice PDF
         await sendInvoiceEmail({
           to: customerEmail,
           customerName,
           invoiceNumber: invoice.invoiceNumber,
-          totalAmount: totalAmount,
+          totalAmount,
           pdfBuffer,
           orderId: order.id,
         });
@@ -284,21 +316,24 @@ export async function POST(request: NextRequest) {
       }
     })();
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...order,
-        subtotal: Number(order.subtotal),
-        totalAmount: Number(order.totalAmount),
-        shippingAmount: Number(order.shippingAmount),
-        gatewayFee: Number(order.gatewayFee),
-        items: order.items.map((i) => ({
-          ...i,
-          unitPrice: Number(i.unitPrice),
-          total: Number(i.total),
-        })),
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          ...order,
+          subtotal: Number(order.subtotal),
+          totalAmount: Number(order.totalAmount),
+          shippingAmount: Number(order.shippingAmount),
+          gatewayFee: Number(order.gatewayFee),
+          items: order.items.map((i) => ({
+            ...i,
+            unitPrice: Number(i.unitPrice),
+            total: Number(i.total),
+          })),
+        },
       },
-    }, { status: 201 });
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Order POST error:", error);
     return NextResponse.json(

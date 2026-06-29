@@ -2,28 +2,30 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ShoppingCart, Trash2, Plus, Minus, Leaf } from "lucide-react";
+import { X, ShoppingCart, Trash2, Plus, Minus, Leaf, Scale } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useCartStore } from "@/store/cart";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
 import { Separator } from "@/components/ui/separator";
-import { calculateShipping } from "@/lib/utils";
+import { calculateShipping, ceilShippingWeight } from "@/lib/utils";
 
 export default function CartDrawer() {
-  const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal } =
+  const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, totalShippingWeight } =
     useCartStore();
-  const [settings, setSettings] = useState<{ shippingFeeTN: number; shippingFeeOther: number; freeShippingThreshold: number } | null>(null);
+  const [settings, setSettings] = useState<{
+    shippingFeeTN: number;
+    shippingFeeOther: number;
+    freeShippingThreshold: number;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetch("/api/settings")
         .then((r) => r.json())
         .then((resData) => {
-          if (resData.success) {
-            setSettings(resData.data);
-          }
+          if (resData.success) setSettings(resData.data);
         })
         .catch((err) => console.error("Failed to load settings:", err));
     }
@@ -33,6 +35,9 @@ export default function CartDrawer() {
   const shippingFeeTN = settings ? settings.shippingFeeTN : 60;
   const shippingFeeOther = settings ? settings.shippingFeeOther : 100;
   const freeShippingThreshold = settings ? settings.freeShippingThreshold : 500;
+
+  const totalWeightKg = totalShippingWeight();
+  const billableWeightKg = ceilShippingWeight(totalWeightKg);
 
   const shipping = calculateShipping({
     items,
@@ -70,9 +75,7 @@ export default function CartDrawer() {
                 <div className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center">
                   <Leaf className="w-3.5 h-3.5 text-cream-100" />
                 </div>
-                <h2 className="text-lg font-display font-bold text-primary-800">
-                  Your Cart
-                </h2>
+                <h2 className="text-lg font-display font-bold text-primary-800">Your Cart</h2>
                 {items.length > 0 && (
                   <span className="text-sm text-muted-foreground">
                     ({items.length} {items.length === 1 ? "item" : "items"})
@@ -96,12 +99,8 @@ export default function CartDrawer() {
                     <ShoppingCart className="w-10 h-10 text-primary-300" />
                   </div>
                   <div>
-                    <p className="text-gray-600 font-medium mb-1">
-                      Your cart is empty
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Add some organic goodness!
-                    </p>
+                    <p className="text-gray-600 font-medium mb-1">Your cart is empty</p>
+                    <p className="text-sm text-muted-foreground">Add some organic goodness!</p>
                   </div>
                   <LinkButton
                     href="/shop"
@@ -115,7 +114,7 @@ export default function CartDrawer() {
                 <div className="space-y-4">
                   {items.map((item) => (
                     <motion.div
-                      key={item.productId}
+                      key={item.variantId}
                       layout
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -124,12 +123,7 @@ export default function CartDrawer() {
                     >
                       <div className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-cream-200">
                         {item.imageUrl ? (
-                          <Image
-                            src={item.imageUrl}
-                            alt={item.name}
-                            fill
-                            className="object-cover"
-                          />
+                          <Image src={item.imageUrl} alt={item.productName} fill className="object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <Leaf className="w-6 h-6 text-primary-300" />
@@ -141,22 +135,18 @@ export default function CartDrawer() {
                         <Link
                           href={`/product/${item.slug}`}
                           onClick={closeCart}
-                          className="font-medium text-sm text-gray-800 hover:text-primary-700 line-clamp-2 leading-tight"
+                          className="font-medium text-sm text-gray-800 hover:text-primary-700 line-clamp-1 leading-tight"
                         >
-                          {item.name}
+                          {item.productName}
                         </Link>
-                        {item.weight && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {item.weight}
-                          </p>
-                        )}
+                        <p className="text-xs text-primary-600 font-medium mt-0.5">
+                          {item.variantName}
+                        </p>
                         <div className="flex items-center justify-between mt-2">
                           {/* Qty controls */}
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() =>
-                                updateQuantity(item.productId, item.quantity - 1)
-                              }
+                              onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
                               className="w-6 h-6 rounded-full bg-white border border-cream-400 flex items-center justify-center hover:border-primary-400 hover:text-primary-600 transition-colors"
                             >
                               <Minus className="w-3 h-3" />
@@ -165,9 +155,7 @@ export default function CartDrawer() {
                               {item.quantity}
                             </span>
                             <button
-                              onClick={() =>
-                                updateQuantity(item.productId, item.quantity + 1)
-                              }
+                              onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
                               disabled={item.quantity >= item.stock}
                               className="w-6 h-6 rounded-full bg-white border border-cream-400 flex items-center justify-center hover:border-primary-400 hover:text-primary-600 transition-colors disabled:opacity-40"
                             >
@@ -175,17 +163,13 @@ export default function CartDrawer() {
                             </button>
                           </div>
                           <p className="text-sm font-bold text-primary-700">
-                            ₹
-                            {(
-                              (item.discountedPrice ?? item.price) *
-                              item.quantity
-                            ).toFixed(2)}
+                            ₹{(item.price * item.quantity).toFixed(2)}
                           </p>
                         </div>
                       </div>
 
                       <button
-                        onClick={() => removeItem(item.productId)}
+                        onClick={() => removeItem(item.variantId)}
                         className="text-red-400 hover:text-red-600 transition-colors self-start mt-1"
                         aria-label="Remove item"
                       >
@@ -205,16 +189,24 @@ export default function CartDrawer() {
                     <span>Subtotal</span>
                     <span>₹{sub.toFixed(2)}</span>
                   </div>
+                  {/* Weight breakdown */}
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Scale className="w-3 h-3" /> Items weight
+                    </span>
+                    <span>{totalWeightKg.toFixed(2)} kg</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Shipping charged as</span>
+                    <span>{billableWeightKg} kg</span>
+                  </div>
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Shipping</span>
+                    <span>Shipping (est.)</span>
                     <span className={shipping === 0 ? "text-primary-600 font-medium" : ""}>
                       {shipping === 0 ? "FREE" : `₹${shipping}`}
                     </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
-                    Calculated for Tamil Nadu. Outside TN flat rate ₹{shippingFeeOther}/kg applies.
-                  </p>
-                  {shipping > 0 && (
+                  {shipping > 0 && sub < freeShippingThreshold && (
                     <p className="text-xs text-muted-foreground bg-amber-50 px-3 py-1.5 rounded-lg">
                       💡 Add ₹{(freeShippingThreshold - sub).toFixed(0)} more for free shipping!
                     </p>

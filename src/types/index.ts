@@ -16,22 +16,82 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   };
 }
 
+// ─── Product Unit ─────────────────────────────────────────────────────────────
+
+export type ProductUnit = "GRAM" | "KILOGRAM" | "MILLILITRE" | "LITRE" | "CUSTOM";
+
+export const PRODUCT_UNIT_LABELS: Record<ProductUnit, string> = {
+  GRAM: "Gram",
+  KILOGRAM: "Kilogram",
+  MILLILITRE: "Millilitre",
+  LITRE: "Litre",
+  CUSTOM: "Custom",
+};
+
+export const PRODUCT_UNIT_ABBR: Record<ProductUnit, string> = {
+  GRAM: "g",
+  KILOGRAM: "kg",
+  MILLILITRE: "ml",
+  LITRE: "L",
+  CUSTOM: "",
+};
+
+// ─── Product Variant Types ────────────────────────────────────────────────────
+
+export interface ProductVariantType {
+  id: string;
+  productId: string;
+  sku: string | null;
+  variantName: string;       // e.g. "500 ml", "1 L", "2 Bottles"
+  quantityValue: number;
+  unit: ProductUnit;
+  customUnit: string | null; // only when unit === "CUSTOM"
+  sellingPrice: number;
+  costPrice: number | null;
+  stock: number;
+  shippingWeight: number;    // in kg
+  barcode: string | null;
+  active: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Form shape used in admin UI (all strings for controlled inputs)
+export interface VariantFormRow {
+  id?: string;            // undefined = new variant
+  variantName: string;
+  quantityValue: string;
+  unit: ProductUnit;
+  customUnit: string;
+  sellingPrice: string;
+  costPrice: string;
+  stock: string;
+  shippingWeight: string;
+  sku: string;
+  isDefault: boolean;
+  active: boolean;
+}
+
 // ─── Product Types ───────────────────────────────────────────────────────────
 
 export interface ProductListItem {
   id: string;
   name: string;
   slug: string;
-  price: number;
-  discountedPrice: number | null;
-  stock: number;
   imageUrls: string[];
   featured: boolean;
-  weight: string | null;
   rating: number;
   reviewCount: number;
   tags: string[];
+  active: boolean;
   category: { id: string; name: string; slug: string };
+  variants: ProductVariantType[];
+  // Computed from variants
+  minPrice: number;
+  maxPrice: number;
+  variantCount: number;
+  totalStock: number;
   createdAt: string;
 }
 
@@ -41,6 +101,7 @@ export interface ProductDetail extends ProductListItem {
   ingredients: string | null;
   benefits: string | null;
   tags: string[];
+  related?: ProductListItem[];
 }
 
 export interface ProductFilters {
@@ -69,14 +130,23 @@ export interface CategoryType {
 // ─── Cart Types ──────────────────────────────────────────────────────────────
 
 export interface CartItem {
-  id: string;
+  // Unique key for cart deduplication
+  variantId: string;
+  // References
   productId: string;
-  name: string;
+  productName: string;
   slug: string;
-  price: number;
-  discountedPrice: number | null;
+  // Variant info
+  variantName: string;        // e.g. "500 ml"
+  sku: string | null;
+  unit: ProductUnit;
+  customUnit: string | null;
+  // Pricing
+  price: number;              // sellingPrice of the selected variant
+  // Logistics
   imageUrl: string;
-  weight: string | null;
+  shippingWeight: number;     // in kg, per unit
+  // Inventory
   quantity: number;
   stock: number;
 }
@@ -128,7 +198,13 @@ export interface OrderSummary {
 export interface OrderItemType {
   id: string;
   productId: string | null;
+  variantId: string | null;
   productName: string;
+  variantNameSnapshot: string | null;
+  quantityValueSnapshot: number | null;
+  unitSnapshot: string | null;
+  customUnitSnapshot: string | null;
+  skuSnapshot: string | null;
   quantity: number;
   unitPrice: number;
   total: number;
@@ -164,7 +240,14 @@ export interface InvoiceDetail extends InvoiceSummary {
 
 export interface InvoiceItemType {
   id: string;
+  productId: string | null;
+  variantId: string | null;
   productName: string;
+  variantNameSnapshot: string | null;
+  quantityValueSnapshot: number | null;
+  unitSnapshot: string | null;
+  customUnitSnapshot: string | null;
+  skuSnapshot: string | null;
   description: string | null;
   quantity: number;
   unitPrice: number;
@@ -184,6 +267,8 @@ export interface CreateInvoiceData {
   paymentMethod?: string;
   notes?: string;
   items: {
+    productId?: string;
+    variantId?: string;
     productName: string;
     description?: string;
     quantity: number;
@@ -215,8 +300,9 @@ export interface DashboardStats {
 export interface LowStockProduct {
   id: string;
   name: string;
-  stock: number;
-  minimumStockLevel: number;
+  // Aggregated from variants
+  totalStock: number;
+  variantCount: number;
 }
 
 // ─── Status Enums ────────────────────────────────────────────────────────────
@@ -271,7 +357,10 @@ export interface SupplierDetail extends SupplierType {
 export interface PurchaseOrderItemType {
   id: string;
   productId: string | null;
+  variantId: string | null;
   productName: string;
+  variantNameSnapshot: string | null;
+  skuSnapshot: string | null;
   quantity: number;
   receivedQuantity: number;
   unit: string;
@@ -307,6 +396,7 @@ export interface CreatePurchaseOrderData {
   notes?: string;
   items: {
     productId?: string;
+    variantId?: string;
     productName: string;
     quantity: number;
     unit?: string;
@@ -329,6 +419,8 @@ export interface InventoryMovementType {
   id: string;
   productId: string;
   product: { id: string; name: string; slug: string };
+  variantId: string | null;
+  variant: { id: string; variantName: string; sku: string | null } | null;
   movementType: MovementType;
   quantity: number;
   previousStock: number;

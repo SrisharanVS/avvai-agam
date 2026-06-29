@@ -154,10 +154,10 @@ export default function AdminDashboardPage() {
                   <div key={p.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
                     <div>
                       <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">Min: {p.minimumStockLevel}</p>
+                      <p className="text-xs text-muted-foreground">{p.variantCount} variant(s)</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-red-600">{p.stock}</span>
+                      <span className="text-sm font-bold text-red-600">{p.totalStock}</span>
                       <Badge className="bg-red-50 text-red-600 text-xs">Low</Badge>
                     </div>
                   </div>

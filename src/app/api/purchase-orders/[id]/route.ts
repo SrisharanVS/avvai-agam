@@ -13,7 +13,8 @@ export async function GET(
         supplier: { select: { id: true, name: true, email: true, phone: true, address: true, gstNumber: true } },
         items: {
           include: {
-            product: { select: { id: true, name: true, slug: true, stock: true } },
+            product: { select: { id: true, name: true, slug: true } },
+            variant: { select: { id: true, variantName: true, stock: true } },
           },
         },
       },
@@ -72,32 +73,123 @@ export async function PATCH(
     };
 
     if (items) {
+      let defaultCategory = await prisma.category.findFirst();
+      if (!defaultCategory) {
+        defaultCategory = await prisma.category.create({
+          data: {
+            name: "Uncategorized",
+            slug: "uncategorized",
+            description: "Default category for auto-created products",
+          },
+        });
+      }
+
       let subtotal = 0;
       let taxAmount = 0;
-      const itemsWithTotals = items.map((item: {
-        productId?: string;
-        productName: string;
-        quantity: number;
-        unit?: string;
-        costPrice: number;
-        taxRate?: number;
-      }) => {
+      const itemsWithTotals = [];
+
+      for (const item of items) {
         const lineSubtotal = item.quantity * item.costPrice;
         const lineTax = lineSubtotal * ((item.taxRate || 0) / 100);
         subtotal += lineSubtotal;
         taxAmount += lineTax;
-        return {
-          productId: item.productId || null,
+
+        let finalVariantId: string | null = item.variantId || null;
+        let finalProductId: string | null = item.productId || null;
+        let variantRecord: any = null;
+        let productRecord: any = null;
+
+        // Resolve variant
+        if (finalVariantId) {
+          variantRecord = await prisma.productVariant.findUnique({
+            where: { id: finalVariantId },
+            include: { product: true },
+          });
+          if (variantRecord) {
+            productRecord = variantRecord.product;
+            finalProductId = productRecord.id;
+          }
+        } else if (finalProductId) {
+          productRecord = await prisma.product.findUnique({ where: { id: finalProductId } });
+          if (productRecord) {
+            // Use the default variant
+            variantRecord = await prisma.productVariant.findFirst({
+              where: { productId: productRecord.id, isDefault: true },
+            });
+            finalVariantId = variantRecord?.id || null;
+          }
+        } else {
+          // Auto-resolve or create product by name
+          productRecord = await prisma.product.findFirst({
+            where: { name: { equals: item.productName.trim(), mode: "insensitive" } },
+          });
+
+          if (productRecord) {
+            finalProductId = productRecord.id;
+            variantRecord = await prisma.productVariant.findFirst({
+              where: { productId: productRecord.id, isDefault: true },
+            });
+            finalVariantId = variantRecord?.id || null;
+          }
+        }
+
+        // Auto-create product + default variant if not found
+        if (!productRecord) {
+          const slug = item.productName
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, "-")
+            .replace(/[^a-z0-9-]/g, "");
+
+          productRecord = await prisma.product.create({
+            data: {
+              name: item.productName.trim(),
+              slug,
+              active: true,
+              categoryId: defaultCategory.id,
+            },
+          });
+          finalProductId = productRecord.id;
+
+          // Create default variant
+          variantRecord = await prisma.productVariant.create({
+            data: {
+              productId: productRecord.id,
+              sku: null,
+              variantName: item.unit || "1 unit",
+              quantityValue: 1,
+              unit: "CUSTOM",
+              customUnit: item.unit || "unit",
+              sellingPrice: item.costPrice,
+              costPrice: item.costPrice,
+              stock: 0,
+              shippingWeight: 1,
+              isDefault: true,
+            },
+          });
+          finalVariantId = variantRecord.id;
+        }
+
+        itemsWithTotals.push({
+          productId: finalProductId,
+          variantId: finalVariantId,
           productName: item.productName,
           quantity: item.quantity,
           receivedQuantity: 0,
-          unit: item.unit || "units",
+          unit: item.unit || variantRecord?.customUnit || variantRecord?.unit || "units",
           costPrice: item.costPrice,
           taxRate: item.taxRate || 0,
           taxAmount: lineTax,
           total: lineSubtotal + lineTax,
-        };
-      });
+          // Snapshots
+          productNameSnapshot: item.productName,
+          variantNameSnapshot: variantRecord?.variantName || null,
+          skuSnapshot: variantRecord?.sku || null,
+          unitSnapshot: item.unit || variantRecord?.unit || "units",
+          costPriceSnapshot: item.costPrice,
+          taxRateSnapshot: item.taxRate || 0,
+        });
+      }
 
       // Delete existing items and recreate
       await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });

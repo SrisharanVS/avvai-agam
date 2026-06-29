@@ -48,11 +48,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { productId, movementType, quantity, notes } = body;
+    const { productId, variantId, movementType, quantity, notes } = body;
 
-    if (!productId || !movementType || !quantity) {
+    if ((!productId && !variantId) || !movementType || quantity === undefined) {
       return NextResponse.json(
-        { success: false, error: "productId, movementType, and quantity are required" },
+        { success: false, error: "productId/variantId, movementType, and quantity are required" },
         { status: 400 }
       );
     }
@@ -62,19 +62,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid movement type" }, { status: 400 });
     }
 
-    const product = await prisma.product.findUnique({ where: { id: productId } });
-    if (!product) {
-      return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
+    let targetVariantId = variantId;
+    let targetProductId = productId;
+
+    if (targetVariantId) {
+      const variant = await prisma.productVariant.findUnique({
+        where: { id: targetVariantId },
+      });
+      if (!variant) {
+        return NextResponse.json({ success: false, error: "Variant not found" }, { status: 404 });
+      }
+      targetProductId = variant.productId;
+    } else if (targetProductId) {
+      // Find the default variant or first variant
+      const defaultVariant = await prisma.productVariant.findFirst({
+        where: { productId: targetProductId, isDefault: true },
+      }) || await prisma.productVariant.findFirst({
+        where: { productId: targetProductId },
+      });
+
+      if (!defaultVariant) {
+        return NextResponse.json({ success: false, error: "No variant found for product" }, { status: 404 });
+      }
+      targetVariantId = defaultVariant.id;
     }
 
-    const previousStock = product.stock;
-    // For adjustments, quantity can be negative (stock reduction)
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: targetVariantId },
+      include: { product: true },
+    });
+
+    if (!variant) {
+      return NextResponse.json({ success: false, error: "Variant not found" }, { status: 404 });
+    }
+
+    const previousStock = variant.stock;
     const newStock = Math.max(0, previousStock + quantity);
 
     const [movement] = await prisma.$transaction([
       prisma.inventoryMovement.create({
         data: {
-          productId,
+          productId: targetProductId,
+          variantId: targetVariantId,
           movementType,
           quantity,
           previousStock,
@@ -84,10 +113,11 @@ export async function POST(request: NextRequest) {
         },
         include: {
           product: { select: { id: true, name: true, slug: true } },
+          variant: { select: { id: true, variantName: true } },
         },
       }),
-      prisma.product.update({
-        where: { id: productId },
+      prisma.productVariant.update({
+        where: { id: targetVariantId },
         data: { stock: newStock },
       }),
     ]);

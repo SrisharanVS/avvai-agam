@@ -158,13 +158,31 @@ export async function POST(request: NextRequest) {
       subtotal += itemTotal;
       totalTax += itemTax;
 
-      // Find product matching name or id to log snapshots
+      // Find product and variant to log snapshots
       let product: any = null;
-      if (item.productId) {
+      let variant: any = null;
+
+      if (item.variantId) {
+        variant = await prisma.productVariant.findUnique({
+          where: { id: item.variantId },
+          include: { product: true }
+        });
+        if (variant) {
+          product = variant.product;
+        }
+      } else if (item.productId) {
         product = await prisma.product.findUnique({ where: { id: item.productId } });
       } else {
         product = await prisma.product.findFirst({
           where: { name: { equals: item.productName, mode: "insensitive" } }
+        });
+      }
+
+      if (product && !variant) {
+        variant = await prisma.productVariant.findFirst({
+          where: { productId: product.id, isDefault: true }
+        }) || await prisma.productVariant.findFirst({
+          where: { productId: product.id }
         });
       }
 
@@ -178,9 +196,12 @@ export async function POST(request: NextRequest) {
         total: parseFloat((itemTotal + itemTax).toFixed(2)),
         // ERP Snapshots & relation
         productId: product?.id || null,
-        productNameSnapshot: item.productName,
-        skuSnapshot: product?.sku || "PROD-UNKNOWN",
-        unitSnapshot: product?.unit || "units",
+        variantId: variant?.id || null,
+        productNameSnapshot: product?.name || item.productName,
+        variantNameSnapshot: variant?.variantName || null,
+        skuSnapshot: variant?.sku || "PROD-UNKNOWN",
+        unitSnapshot: variant?.unit || "units",
+        customUnitSnapshot: variant?.customUnit || null,
         unitPriceSnapshot: item.unitPrice,
         taxRateSnapshot: itemTaxRate
       });

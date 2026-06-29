@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ShoppingCart, Star, Leaf, Tag } from "lucide-react";
+import { ShoppingCart, Star, Leaf, Package2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCartStore } from "@/store/cart";
@@ -17,32 +17,31 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCartStore();
 
-  const discountPercent =
-    product.discountedPrice && product.price > 0
-      ? Math.round(
-        ((product.price - product.discountedPrice) / product.price) * 100
-      )
-      : null;
+  const defaultVariant =
+    product.variants.find((v) => v.isDefault) || product.variants[0];
+
+  const isOutOfStock = product.totalStock === 0;
 
   const handleAddToCart = () => {
+    if (!defaultVariant) return;
     addItem({
-      id: product.id,
+      variantId: defaultVariant.id,
       productId: product.id,
-      name: product.name,
+      productName: product.name,
       slug: product.slug,
-      price: product.price,
-      discountedPrice: product.discountedPrice,
+      variantName: defaultVariant.variantName,
+      sku: defaultVariant.sku,
+      unit: defaultVariant.unit,
+      customUnit: defaultVariant.customUnit,
+      price: defaultVariant.sellingPrice,
       imageUrl: product.imageUrls[0] || "",
-      weight: product.weight,
-      quantity: 1,
-      stock: product.stock,
+      shippingWeight: defaultVariant.shippingWeight,
+      stock: defaultVariant.stock,
     });
     toast.success(`${product.name} added to cart!`, {
-      description: "Check your cart to checkout.",
+      description: `${defaultVariant.variantName} — Check your cart to checkout.`,
     });
   };
-
-  const isOutOfStock = product.stock === 0;
 
   return (
     <motion.div
@@ -68,11 +67,6 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-          {discountPercent && discountPercent > 0 && (
-            <Badge className="bg-amber-400 text-primary-900 font-bold text-xs px-2 py-0.5">
-              -{discountPercent}%
-            </Badge>
-          )}
           {product.featured && (
             <Badge className="bg-primary-600 text-cream-100 text-xs px-2 py-0.5">
               ⭐ Best Seller
@@ -100,10 +94,16 @@ export default function ProductCard({ product }: ProductCardProps) {
           </h3>
         </Link>
 
-        {product.weight && (
+        {/* Variant count */}
+        {product.variantCount > 1 && (
           <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-            <Tag className="w-3 h-3" />
-            {product.weight}
+            <Package2 className="w-3 h-3" />
+            Available in {product.variantCount} sizes
+          </p>
+        )}
+        {product.variantCount === 1 && defaultVariant && (
+          <p className="text-xs text-muted-foreground mb-2">
+            {defaultVariant.variantName}
           </p>
         )}
 
@@ -123,31 +123,23 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Price & CTA */}
         <div className="mt-auto flex items-center justify-between gap-2">
           <div>
-            {product.discountedPrice ? (
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-lg font-bold text-primary-700">
-                  ₹{product.discountedPrice.toFixed(2)}
-                </span>
-                <span className="text-sm text-muted-foreground line-through">
-                  ₹{product.price.toFixed(2)}
-                </span>
-              </div>
-            ) : (
-              <span className="text-lg font-bold text-primary-700">
-                ₹{product.price.toFixed(2)}
-              </span>
-            )}
+            <p className="text-[10px] text-muted-foreground">
+              {product.variantCount > 1 ? "Starting from" : ""}
+            </p>
+            <span className="text-lg font-bold text-primary-700">
+              ₹{product.minPrice.toFixed(0)}
+            </span>
           </div>
 
           <Button
             id={`add-to-cart-${product.id}`}
             size="sm"
             onClick={handleAddToCart}
-            disabled={isOutOfStock}
+            disabled={isOutOfStock || !defaultVariant}
             className="bg-primary-600 hover:bg-primary-700 text-cream-100 rounded-xl shrink-0 transition-all active:scale-95"
           >
             <ShoppingCart className="w-3.5 h-3.5 mr-1" />
-            Add
+            {product.variantCount > 1 ? "Quick Add" : "Add"}
           </Button>
         </div>
       </div>

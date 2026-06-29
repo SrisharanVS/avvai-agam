@@ -19,7 +19,7 @@ export async function POST(
 
     const po = await prisma.purchaseOrder.findUnique({
       where: { id },
-      include: { items: { include: { product: true } } },
+      include: { items: { include: { variant: true, product: true } } },
     });
 
     if (!po) {
@@ -32,7 +32,6 @@ export async function POST(
       );
     }
 
-    // Process each received item in a transaction
     await prisma.$transaction(async (tx) => {
       for (const receiveItem of items) {
         const poItem = po.items.find((i) => i.id === receiveItem.itemId);
@@ -45,40 +44,29 @@ export async function POST(
         const actualReceived = Math.min(qty, remaining);
         if (actualReceived <= 0) continue;
 
-        // Update received quantity on PO item
         await tx.purchaseOrderItem.update({
           where: { id: poItem.id },
           data: { receivedQuantity: { increment: actualReceived } },
         });
 
-        // Update product stock and cost prices if linked to a product
-        if (poItem.productId && poItem.product) {
-          const product = poItem.product;
-          const previousStock = product.stock;
+        // Increase ProductVariant stock (preferred) or fall back to product-level
+        if (poItem.variantId && poItem.variant) {
+          const previousStock = poItem.variant.stock;
           const newStock = previousStock + actualReceived;
           const costPrice = Number(poItem.costPrice);
 
-          // Weighted average cost calculation
-          const currentAvg = product.averageCostPrice ? Number(product.averageCostPrice) : costPrice;
-          const newAvgCost =
-            previousStock === 0
-              ? costPrice
-              : (currentAvg * previousStock + costPrice * actualReceived) / newStock;
-
-          await tx.product.update({
-            where: { id: poItem.productId },
+          await tx.productVariant.update({
+            where: { id: poItem.variantId },
             data: {
               stock: newStock,
-              lastPurchasePrice: costPrice,
-              averageCostPrice: newAvgCost,
-              costPrice: costPrice,
+              costPrice,
             },
           });
 
-          // Record inventory movement
           await tx.inventoryMovement.create({
             data: {
-              productId: poItem.productId,
+              productId: poItem.productId || poItem.variant.productId,
+              variantId: poItem.variantId,
               movementType: "PURCHASE",
               quantity: actualReceived,
               previousStock,
@@ -88,6 +76,35 @@ export async function POST(
               notes: notes || `Received from PO ${po.poNumber}`,
             },
           });
+        } else if (poItem.productId) {
+          // Legacy fallback: no variant linked — find/create default variant
+          const defaultVariant = await tx.productVariant.findFirst({
+            where: { productId: poItem.productId, isDefault: true },
+          });
+
+          if (defaultVariant) {
+            const previousStock = defaultVariant.stock;
+            const newStock = previousStock + actualReceived;
+
+            await tx.productVariant.update({
+              where: { id: defaultVariant.id },
+              data: { stock: newStock },
+            });
+
+            await tx.inventoryMovement.create({
+              data: {
+                productId: poItem.productId,
+                variantId: defaultVariant.id,
+                movementType: "PURCHASE",
+                quantity: actualReceived,
+                previousStock,
+                newStock,
+                referenceType: "PURCHASE_ORDER",
+                referenceId: po.id,
+                notes: notes || `Received from PO ${po.poNumber}`,
+              },
+            });
+          }
         }
       }
 
@@ -96,9 +113,7 @@ export async function POST(
         where: { purchaseOrderId: id },
       });
 
-      const allReceived = updatedItems.every(
-        (i) => i.receivedQuantity >= i.quantity
-      );
+      const allReceived = updatedItems.every((i) => i.receivedQuantity >= i.quantity);
       const anyReceived = updatedItems.some((i) => i.receivedQuantity > 0);
 
       const newStatus = allReceived
@@ -117,7 +132,13 @@ export async function POST(
       where: { id },
       include: {
         supplier: { select: { id: true, name: true, email: true } },
-        items: { include: { product: { select: { id: true, name: true, stock: true } } } },
+        items: {
+          include: {
+            variant: {
+              select: { id: true, variantName: true, stock: true, sku: true },
+            },
+          },
+        },
       },
     });
 
@@ -140,6 +161,9 @@ export async function POST(
     });
   } catch (error) {
     console.error("PO receive error:", error);
-    return NextResponse.json({ success: false, error: "Failed to receive inventory" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Failed to receive inventory" },
+      { status: 500 }
+    );
   }
 }

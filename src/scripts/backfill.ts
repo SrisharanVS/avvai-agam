@@ -3,27 +3,29 @@ import { prisma } from "../lib/prisma";
 async function main() {
   console.log("Starting master data backfill...");
 
-  // 1. Backfill Product SKUs
-  const products = await prisma.product.findMany({
-    orderBy: { createdAt: "asc" }
+  // 1. Backfill ProductVariant SKUs
+  const variants = await prisma.productVariant.findMany({
+    orderBy: { createdAt: "asc" },
+    include: { product: true }
   });
-  console.log(`Found ${products.length} products to check for SKUs.`);
-  let prodCount = 1;
-  for (const prod of products) {
-    if (!prod.sku) {
-      const sku = `PROD-${String(prodCount).padStart(6, "0")}`;
-      await prisma.product.update({
-        where: { id: prod.id },
+  console.log(`Found ${variants.length} variants to check for SKUs.`);
+  let varCount = 1;
+  for (const variant of variants) {
+    if (!variant.sku) {
+      const sku = `VAR-${String(varCount).padStart(6, "0")}`;
+      await prisma.productVariant.update({
+        where: { id: variant.id },
         data: { sku }
       });
-      console.log(`Assigned SKU ${sku} to product: ${prod.name}`);
-      prodCount++;
+      console.log(`Assigned SKU ${sku} to variant: ${variant.variantName} of product: ${variant.product.name}`);
+      varCount++;
     } else {
-      // Find the number from existing sku to ensure sequence count remains safe
-      const parts = prod.sku.split("-");
-      const num = parseInt(parts[1], 10);
-      if (!isNaN(num) && num >= prodCount) {
-        prodCount = num + 1;
+      const parts = variant.sku.split("-");
+      if (parts.length > 1) {
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num) && num >= varCount) {
+          varCount = num + 1;
+        }
       }
     }
   }
@@ -88,9 +90,11 @@ async function main() {
       cusCount++;
     } else {
       const parts = existingCus.customerId.split("-");
-      const num = parseInt(parts[1], 10);
-      if (!isNaN(num) && num >= cusCount) {
-        cusCount = num + 1;
+      if (parts.length > 1) {
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num) && num >= cusCount) {
+          cusCount = num + 1;
+        }
       }
     }
     emailToCustomerRecord.set(email, existingCus);
@@ -121,16 +125,18 @@ async function main() {
     for (const item of inv.items) {
       // Try to find product by name
       const prod = await prisma.product.findFirst({
-        where: { name: { equals: item.productName, mode: "insensitive" } }
+        where: { name: { equals: item.productName, mode: "insensitive" } },
+        include: { variants: true }
       });
+      const firstVariant = prod?.variants[0];
 
       await prisma.invoiceItem.update({
         where: { id: item.id },
         data: {
           productId: prod?.id || null,
           productNameSnapshot: item.productNameSnapshot || item.productName,
-          skuSnapshot: item.skuSnapshot || prod?.sku || "PROD-UNKNOWN",
-          unitSnapshot: item.unitSnapshot || prod?.unit || "units",
+          skuSnapshot: item.skuSnapshot || firstVariant?.sku || "PROD-UNKNOWN",
+          unitSnapshot: item.unitSnapshot || firstVariant?.unit || "units",
           unitPriceSnapshot: item.unitPriceSnapshot || item.unitPrice,
           taxRateSnapshot: item.taxRateSnapshot || item.taxRate
         }
@@ -143,16 +149,23 @@ async function main() {
   const poItems = await prisma.purchaseOrderItem.findMany();
   for (const item of poItems) {
     const prod = item.productId
-      ? await prisma.product.findUnique({ where: { id: item.productId } })
-      : await prisma.product.findFirst({ where: { name: { equals: item.productName, mode: "insensitive" } } });
+      ? await prisma.product.findUnique({
+          where: { id: item.productId },
+          include: { variants: true }
+        })
+      : await prisma.product.findFirst({
+          where: { name: { equals: item.productName, mode: "insensitive" } },
+          include: { variants: true }
+        });
+    const firstVariant = prod?.variants[0];
 
     await prisma.purchaseOrderItem.update({
       where: { id: item.id },
       data: {
         productId: prod?.id || item.productId,
         productNameSnapshot: item.productNameSnapshot || item.productName,
-        skuSnapshot: item.skuSnapshot || prod?.sku || "PROD-UNKNOWN",
-        unitSnapshot: item.unitSnapshot || item.unit || prod?.unit || "units",
+        skuSnapshot: item.skuSnapshot || firstVariant?.sku || "PROD-UNKNOWN",
+        unitSnapshot: item.unitSnapshot || item.unit || firstVariant?.unit || "units",
         costPriceSnapshot: item.costPriceSnapshot || item.costPrice,
         taxRateSnapshot: item.taxRateSnapshot || item.taxRate
       }

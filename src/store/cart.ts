@@ -8,8 +8,8 @@ interface CartStore {
 
   // Actions
   addItem: (item: Omit<CartItem, "quantity"> & { quantity?: number }) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeItem: (variantId: string) => void;
+  updateQuantity: (variantId: string, quantity: number) => void;
   clearCart: () => void;
   openCart: () => void;
   closeCart: () => void;
@@ -19,6 +19,7 @@ interface CartStore {
   totalItems: () => number;
   totalPrice: () => number;
   subtotal: () => number;
+  totalShippingWeight: () => number;
 }
 
 export const useCartStore = create<CartStore>()(
@@ -30,7 +31,7 @@ export const useCartStore = create<CartStore>()(
       addItem: (newItem) => {
         set((state) => {
           const existing = state.items.find(
-            (i) => i.productId === newItem.productId
+            (i) => i.variantId === newItem.variantId
           );
 
           if (existing) {
@@ -40,7 +41,7 @@ export const useCartStore = create<CartStore>()(
             );
             return {
               items: state.items.map((i) =>
-                i.productId === newItem.productId
+                i.variantId === newItem.variantId
                   ? { ...i, quantity: newQty }
                   : i
               ),
@@ -58,20 +59,20 @@ export const useCartStore = create<CartStore>()(
         });
       },
 
-      removeItem: (productId) => {
+      removeItem: (variantId) => {
         set((state) => ({
-          items: state.items.filter((i) => i.productId !== productId),
+          items: state.items.filter((i) => i.variantId !== variantId),
         }));
       },
 
-      updateQuantity: (productId, quantity) => {
+      updateQuantity: (variantId, quantity) => {
         if (quantity <= 0) {
-          get().removeItem(productId);
+          get().removeItem(variantId);
           return;
         }
         set((state) => ({
           items: state.items.map((i) =>
-            i.productId === productId
+            i.variantId === variantId
               ? { ...i, quantity: Math.min(quantity, i.stock) }
               : i
           ),
@@ -87,19 +88,22 @@ export const useCartStore = create<CartStore>()(
       totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
 
       subtotal: () =>
-        get().items.reduce((sum, i) => {
-          const price = i.discountedPrice ?? i.price;
-          return sum + price * i.quantity;
-        }, 0),
+        get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+
+      totalShippingWeight: () =>
+        get().items.reduce(
+          (sum, i) => sum + i.shippingWeight * i.quantity,
+          0
+        ),
 
       totalPrice: () => {
         const sub = get().subtotal();
-        const shipping = 0;
+        const shipping = 0; // calculated at checkout with live settings
         return sub + shipping;
       },
     }),
     {
-      name: "avvai-cart",
+      name: "avvai-cart-v2", // bumped version to clear stale carts from old format
       storage: createJSONStorage(() => localStorage),
     }
   )

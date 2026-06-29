@@ -80,21 +80,27 @@ async function run() {
 
   // 3. Check Auto-created Product
   const newProduct = await prisma.product.findFirst({
-    where: { name: { contains: "Turmeric Oil", mode: "insensitive" } }
+    where: { name: { contains: "Turmeric Oil", mode: "insensitive" } },
+    include: { variants: true }
   });
 
   if (newProduct) {
     console.log("--- Auto-Created Product Details ---");
-    console.log(`SKU: ${newProduct.sku}`);
     console.log(`Name: ${newProduct.name}`);
-    console.log(`Unit: ${newProduct.unit}`);
-    console.log(`Cost Price: ₹${newProduct.costPrice}`);
-    console.log(`Selling Price: ₹${newProduct.price}`);
-    console.log(`Stock: ${newProduct.stock}`);
     console.log(`Active: ${newProduct.active}`);
+    console.log(`Variants count: ${newProduct.variants.length}`);
+    newProduct.variants.forEach((v) => {
+      console.log(`  - Variant: ${v.variantName}`);
+      console.log(`    SKU: ${v.sku}`);
+      console.log(`    Unit: ${v.unit} (${v.customUnit || "N/A"})`);
+      console.log(`    Cost Price: ₹${v.costPrice}`);
+      console.log(`    Selling Price: ₹${v.sellingPrice}`);
+      console.log(`    Stock: ${v.stock}`);
+      console.log(`    Is Default: ${v.isDefault}`);
+    });
     console.log();
   } else {
-    console.log("Auto-created product 'Super Organic Turmeric Oil' not found.\n");
+    console.log("Auto-created product containing 'Turmeric Oil' not found.\n");
   }
 
   await prisma.$disconnect();

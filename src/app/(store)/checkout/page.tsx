@@ -18,6 +18,7 @@ import {
   Smartphone,
   Building2,
   Wallet,
+  Scale,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LinkButton } from "@/components/ui/link-button";
@@ -27,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useCartStore } from "@/store/cart";
 import { toast } from "sonner";
-import { calculateShipping } from "@/lib/utils";
+import { calculateShipping, ceilShippingWeight } from "@/lib/utils";
 
 // ─── Schema ──────────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ const FormField = ({
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { items, subtotal, totalPrice, clearCart } = useCartStore();
+  const { items, subtotal, totalShippingWeight, clearCart } = useCartStore();
 
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("RAZORPAY");
@@ -130,6 +131,8 @@ export default function CheckoutPage() {
   const selectedState = watch("state");
 
   const sub = subtotal();
+  const totalWeightKg = totalShippingWeight();
+  const billableWeightKg = ceilShippingWeight(totalWeightKg);
   const shippingFeeTN = settings ? settings.shippingFeeTN : 60;
   const shippingFeeOther = settings ? settings.shippingFeeOther : 100;
   const freeShippingThreshold = settings ? settings.freeShippingThreshold : 500;
@@ -155,10 +158,10 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const orderItems = items.map((item) => ({
-        productId: item.productId,
-        productName: item.name,
+        variantId: item.variantId,
+        productName: item.productName,
         quantity: item.quantity,
-        unitPrice: item.discountedPrice ?? item.price,
+        unitPrice: item.price,
       }));
 
       const res = await fetch("/api/orders", {
@@ -202,7 +205,7 @@ export default function CheckoutPage() {
 
         // 2. Create Razorpay Order on the server (server validates prices & stock)
         const cartItemsForServer = items.map((item) => ({
-          productId: item.productId,
+          variantId: item.variantId,
           quantity: item.quantity,
         }));
 
@@ -604,12 +607,12 @@ export default function CheckoutPage() {
               </h2>
               <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
                 {items.map((item) => (
-                  <div key={item.productId} className="flex gap-3">
+                  <div key={item.variantId} className="flex gap-3">
                     <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-cream-200 flex-shrink-0">
                       {item.imageUrl ? (
                         <Image
                           src={item.imageUrl}
-                          alt={item.name}
+                          alt={item.productName}
                           fill
                           className="object-cover"
                         />
@@ -621,12 +624,13 @@ export default function CheckoutPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 line-clamp-1">
-                        {item.name}
+                        {item.productName}
                       </p>
+                      <p className="text-xs text-primary-600">{item.variantName}</p>
                       <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
                     </div>
                     <p className="text-sm font-bold text-primary-700 shrink-0">
-                      ₹{((item.discountedPrice ?? item.price) * item.quantity).toFixed(0)}
+                      ₹{(item.price * item.quantity).toFixed(0)}
                     </p>
                   </div>
                 ))}
@@ -636,6 +640,17 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span>Subtotal</span>
                   <span>₹{sub.toFixed(2)}</span>
+                </div>
+                {/* Weight breakdown */}
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Scale className="w-3 h-3" /> Items weight
+                  </span>
+                  <span>{totalWeightKg.toFixed(2)} kg</span>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Shipping charged as</span>
+                  <span>{billableWeightKg} kg</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Shipping</span>

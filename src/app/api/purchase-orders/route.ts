@@ -56,7 +56,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("PO GET error:", error);
-    return NextResponse.json({ success: false, error: "Failed to fetch purchase orders" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch purchase orders" },
+      { status: 500 }
+    );
   }
 }
 
@@ -66,25 +69,30 @@ export async function POST(request: NextRequest) {
     const { supplierId, expectedDeliveryDate, notes, items } = body;
 
     if (!supplierId) {
-      return NextResponse.json({ success: false, error: "Supplier is required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Supplier is required" },
+        { status: 400 }
+      );
     }
     if (!items || items.length === 0) {
-      return NextResponse.json({ success: false, error: "At least one item is required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "At least one item is required" },
+        { status: 400 }
+      );
     }
 
-    // Find default category for inline auto-created products
+    // Find default category for auto-created products
     let defaultCategory = await prisma.category.findFirst();
     if (!defaultCategory) {
       defaultCategory = await prisma.category.create({
         data: {
           name: "Uncategorized",
           slug: "uncategorized",
-          description: "Default category for auto-created products"
-        }
+          description: "Default category for auto-created products",
+        },
       });
     }
 
-    // Calculate totals & resolve/create products
     let subtotal = 0;
     let taxAmount = 0;
     const itemsWithTotals = [];
@@ -95,38 +103,50 @@ export async function POST(request: NextRequest) {
       subtotal += lineSubtotal;
       taxAmount += lineTax;
 
-      let finalProductId = item.productId || null;
+      let finalVariantId: string | null = item.variantId || null;
+      let finalProductId: string | null = item.productId || null;
+      let variantRecord: any = null;
       let productRecord: any = null;
 
-      if (finalProductId) {
-        productRecord = await prisma.product.findUnique({ where: { id: finalProductId } });
-      } else {
-        // Look up product by name
-        productRecord = await prisma.product.findFirst({
-          where: { name: { equals: item.productName.trim(), mode: "insensitive" } }
+      // Resolve variant
+      if (finalVariantId) {
+        variantRecord = await prisma.productVariant.findUnique({
+          where: { id: finalVariantId },
+          include: { product: true },
         });
+        if (variantRecord) {
+          productRecord = variantRecord.product;
+          finalProductId = productRecord.id;
+        }
+      } else if (finalProductId) {
+        productRecord = await prisma.product.findUnique({ where: { id: finalProductId } });
+        if (productRecord) {
+          // Use the default variant
+          variantRecord = await prisma.productVariant.findFirst({
+            where: { productId: productRecord.id, isDefault: true },
+          });
+          finalVariantId = variantRecord?.id || null;
+        }
+      } else {
+        // Auto-resolve or create product by name
+        productRecord = await prisma.product.findFirst({
+          where: { name: { equals: item.productName.trim(), mode: "insensitive" } },
+        });
+
         if (productRecord) {
           finalProductId = productRecord.id;
+          variantRecord = await prisma.productVariant.findFirst({
+            where: { productId: productRecord.id, isDefault: true },
+          });
+          finalVariantId = variantRecord?.id || null;
         }
       }
 
-      // If product does not exist, auto-create it
+      // Auto-create product + default variant if not found
       if (!productRecord) {
-        // Generate SKU sequentially
-        const latestProduct = await prisma.product.findFirst({
-          orderBy: { sku: "desc" },
-          where: { sku: { startsWith: "PROD-" } }
-        });
-        let nextNum = 1;
-        if (latestProduct && latestProduct.sku) {
-          const parts = latestProduct.sku.split("-");
-          const num = parseInt(parts[1], 10);
-          if (!isNaN(num)) {
-            nextNum = num + 1;
-          }
-        }
-        const sku = `PROD-${String(nextNum).padStart(6, "0")}`;
-        const slug = item.productName.toLowerCase().trim()
+        const slug = item.productName
+          .toLowerCase()
+          .trim()
           .replace(/\s+/g, "-")
           .replace(/[^a-z0-9-]/g, "");
 
@@ -134,36 +154,49 @@ export async function POST(request: NextRequest) {
           data: {
             name: item.productName.trim(),
             slug,
-            sku,
-            unit: item.unit || "units",
-            defaultTaxRate: item.taxRate || 0,
-            stock: 0,
-            price: item.costPrice, // Default selling price set to cost price
-            costPrice: item.costPrice,
             active: true,
-            categoryId: defaultCategory.id
-          }
+            categoryId: defaultCategory.id,
+          },
         });
         finalProductId = productRecord.id;
-        console.log(`Auto-created missing product ${sku} during PO creation: ${item.productName}`);
+
+        // Create default variant
+        variantRecord = await prisma.productVariant.create({
+          data: {
+            productId: productRecord.id,
+            sku: null,
+            variantName: item.unit || "1 unit",
+            quantityValue: 1,
+            unit: "CUSTOM",
+            customUnit: item.unit || "unit",
+            sellingPrice: item.costPrice,
+            costPrice: item.costPrice,
+            stock: 0,
+            shippingWeight: 1,
+            isDefault: true,
+          },
+        });
+        finalVariantId = variantRecord.id;
       }
 
       itemsWithTotals.push({
         productId: finalProductId,
+        variantId: finalVariantId,
         productName: item.productName,
         quantity: item.quantity,
         receivedQuantity: 0,
-        unit: item.unit || productRecord.unit || "units",
+        unit: item.unit || variantRecord?.customUnit || variantRecord?.unit || "units",
         costPrice: item.costPrice,
         taxRate: item.taxRate || 0,
         taxAmount: lineTax,
         total: lineSubtotal + lineTax,
-        // ERP Snapshots
+        // Snapshots
         productNameSnapshot: item.productName,
-        skuSnapshot: productRecord.sku || "PROD-UNKNOWN",
-        unitSnapshot: item.unit || productRecord.unit || "units",
+        variantNameSnapshot: variantRecord?.variantName || null,
+        skuSnapshot: variantRecord?.sku || null,
+        unitSnapshot: item.unit || variantRecord?.unit || "units",
         costPriceSnapshot: item.costPrice,
-        taxRateSnapshot: item.taxRate || 0
+        taxRateSnapshot: item.taxRate || 0,
       });
     }
 
@@ -185,23 +218,29 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...po,
-        subtotal: Number(po.subtotal),
-        taxAmount: Number(po.taxAmount),
-        totalAmount: Number(po.totalAmount),
-        items: po.items.map((i) => ({
-          ...i,
-          costPrice: Number(i.costPrice),
-          taxAmount: Number(i.taxAmount),
-          total: Number(i.total),
-        })),
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          ...po,
+          subtotal: Number(po.subtotal),
+          taxAmount: Number(po.taxAmount),
+          totalAmount: Number(po.totalAmount),
+          items: po.items.map((i) => ({
+            ...i,
+            costPrice: Number(i.costPrice),
+            taxAmount: Number(i.taxAmount),
+            total: Number(i.total),
+          })),
+        },
       },
-    }, { status: 201 });
+      { status: 201 }
+    );
   } catch (error) {
     console.error("PO POST error:", error);
-    return NextResponse.json({ success: false, error: "Failed to create purchase order" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Failed to create purchase order" },
+      { status: 500 }
+    );
   }
 }

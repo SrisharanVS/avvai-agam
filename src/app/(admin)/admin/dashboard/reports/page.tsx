@@ -78,13 +78,32 @@ export default function ReportsPage() {
       }
 
       if (productsData.success) {
-        setStockReport(productsData.data.map((p: { name: string; stock: number; costPrice?: number; price: number }) => ({
-          name: p.name,
-          stock: p.stock,
-          costPrice: p.costPrice ?? null,
-          price: p.price,
-          inventoryValue: p.stock * (p.costPrice ?? p.price),
-        })));
+        const rows: StockReport[] = [];
+        productsData.data.forEach((p: any) => {
+          if (p.variants && p.variants.length > 0) {
+            p.variants.forEach((v: any) => {
+              const fullName = p.variants.length > 1 || v.variantName !== "Default"
+                ? `${p.name} — ${v.variantName}`
+                : p.name;
+              rows.push({
+                name: fullName,
+                stock: v.stock,
+                costPrice: v.costPrice ?? null,
+                price: v.sellingPrice,
+                inventoryValue: v.stock * (v.costPrice ?? v.sellingPrice),
+              });
+            });
+          } else {
+            rows.push({
+              name: p.name,
+              stock: 0,
+              costPrice: null,
+              price: 0,
+              inventoryValue: 0,
+            });
+          }
+        });
+        setStockReport(rows);
       }
 
       if (movementsData.success) {

@@ -175,7 +175,7 @@ export function AutocompleteCombobox({
 
           {suggestions.map((item, idx) => (
             <div
-              key={item.id || idx}
+              key={item.variantId ? `${item.id}-${item.variantId}` : (item.id || idx)}
               onClick={() => selectItem(item)}
               className={`px-4 py-2 text-sm cursor-pointer transition-colors ${
                 focusedIndex === idx

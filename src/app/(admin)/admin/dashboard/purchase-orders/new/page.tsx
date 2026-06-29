@@ -14,6 +14,7 @@ import { ProductCombobox } from "@/components/admin/ProductCombobox";
 
 interface LineItem {
   productId: string | null;
+  variantId: string | null;
   productName: string;
   quantity: number;
   unit: string;
@@ -31,7 +32,7 @@ function NewPOForm() {
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { productId: null, productName: "", quantity: 1, unit: "units", costPrice: 0, taxRate: 0 },
+    { productId: null, variantId: null, productName: "", quantity: 1, unit: "units", costPrice: 0, taxRate: 0 },
   ]);
   const [saving, setSaving] = useState(false);
   const [saveType, setSaveType] = useState<"draft" | "submit">("draft");
@@ -59,9 +60,10 @@ function NewPOForm() {
       updated[index] = {
         ...updated[index],
         productId: product.id,
+        variantId: product.variantId || null,
         productName: product.name,
         unit: product.unit || "units",
-        costPrice: Number(product.costPrice || product.lastPurchasePrice || 0),
+        costPrice: Number(product.costPrice || 0),
         taxRate: Number(product.defaultTaxRate || 0)
       };
       return updated;
@@ -75,6 +77,7 @@ function NewPOForm() {
       updated[index] = {
         ...updated[index],
         productId: null,
+        variantId: null,
         productName: name,
         unit: "units",
         costPrice: 0,
@@ -87,7 +90,7 @@ function NewPOForm() {
   const addItem = () => {
     setLineItems((prev) => [
       ...prev,
-      { productId: null, productName: "", quantity: 1, unit: "units", costPrice: 0, taxRate: 0 },
+      { productId: null, variantId: null, productName: "", quantity: 1, unit: "units", costPrice: 0, taxRate: 0 },
     ]);
   };
 
@@ -122,6 +125,7 @@ function NewPOForm() {
           notes: notes || undefined,
           items: validItems.map((item) => ({
             productId: item.productId,
+            variantId: item.variantId,
             productName: item.productName,
             quantity: item.quantity,
             unit: item.unit,
@@ -235,7 +239,7 @@ function NewPOForm() {
           </Card>
 
           {/* Line Items */}
-          <Card className="rounded-2xl border-0 shadow-card">
+          <Card className="rounded-2xl border-0 shadow-card !overflow-visible">
             <CardHeader className="border-b border-gray-50 flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold text-gray-700">Products</CardTitle>
               <button

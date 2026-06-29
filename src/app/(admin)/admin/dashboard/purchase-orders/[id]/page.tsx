@@ -379,7 +379,15 @@ export default function PODetailPage() {
                         <tr key={item.id} className="hover:bg-gray-50/50">
                           <td className="px-5 py-4">
                             <p className="font-medium text-gray-800 text-sm">{item.productName}</p>
-                            <p className="text-xs text-muted-foreground">{item.unit}</p>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span>{item.unit}</span>
+                              {item.skuSnapshot && (
+                                <>
+                                  <span className="text-gray-300">·</span>
+                                  <span className="font-mono text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{item.skuSnapshot}</span>
+                                </>
+                              )}
+                            </p>
                           </td>
                           <td className="px-5 py-4 text-center text-sm font-medium">{item.quantity}</td>
                           <td className="px-5 py-4 text-center">

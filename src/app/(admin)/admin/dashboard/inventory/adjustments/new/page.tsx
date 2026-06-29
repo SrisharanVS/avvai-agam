@@ -18,12 +18,14 @@ export default function ManualAdjustmentPage() {
   const router = useRouter();
   const [products, setProducts] = useState<ProductListItem[]>([]);
   const [productId, setProductId] = useState("");
+  const [variantId, setVariantId] = useState("");
   const [movementType, setMovementType] = useState("ADJUSTMENT");
   const [quantity, setQuantity] = useState<number>(0);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   const selectedProduct = products.find((p) => p.id === productId);
+  const selectedVariant = selectedProduct?.variants?.find((v) => v.id === variantId);
 
   useEffect(() => {
     fetch("/api/products?limit=200").then((r) => r.json()).then((d) => {
@@ -34,6 +36,7 @@ export default function ManualAdjustmentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productId) { toast.error("Select a product"); return; }
+    if (!variantId) { toast.error("Select a variant"); return; }
     if (quantity === 0) { toast.error("Quantity cannot be zero"); return; }
 
     setSaving(true);
@@ -44,7 +47,7 @@ export default function ManualAdjustmentPage() {
       const res = await fetch("/api/inventory/movements", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, movementType, quantity: effectiveQty, notes }),
+        body: JSON.stringify({ productId, variantId, movementType, quantity: effectiveQty, notes }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
@@ -91,27 +94,60 @@ export default function ManualAdjustmentPage() {
                   <select
                     id="adjustment-product"
                     value={productId}
-                    onChange={(e) => setProductId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setProductId(val);
+                      const p = products.find((prod) => prod.id === val);
+                      if (p && p.variants && p.variants.length > 0) {
+                        const def = p.variants.find((v) => v.isDefault) || p.variants[0];
+                        setVariantId(def.id);
+                      } else {
+                        setVariantId("");
+                      }
+                    }}
                     required
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white appearance-none"
                   >
                     <option value="">Select a product...</option>
                     {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} (Current stock: {p.stock})</option>
+                      <option key={p.id} value={p.id}>{p.name} (Total stock: {p.totalStock})</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 </div>
-                {selectedProduct && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-xs text-muted-foreground mt-1.5 bg-gray-50 px-3 py-2 rounded-lg"
-                  >
-                    Current stock: <span className="font-semibold text-gray-700">{selectedProduct.stock}</span> units
-                  </motion.p>
-                )}
               </div>
+
+              {/* Variant */}
+              {selectedProduct && selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Variant *</label>
+                  <div className="relative">
+                    <select
+                      id="adjustment-variant"
+                      value={variantId}
+                      onChange={(e) => setVariantId(e.target.value)}
+                      required
+                      className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white appearance-none"
+                    >
+                      {selectedProduct.variants.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.variantName} (Current Stock: {v.stock})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                  {selectedVariant && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-muted-foreground mt-1.5 bg-gray-50 px-3 py-2 rounded-lg"
+                    >
+                      Current stock: <span className="font-semibold text-gray-700">{selectedVariant.stock}</span> units
+                    </motion.p>
+                  )}
+                </div>
+              )}
 
               {/* Type */}
               <div>
@@ -147,7 +183,7 @@ export default function ManualAdjustmentPage() {
                   required
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
-                {selectedProduct && quantity !== 0 && (
+                {selectedVariant && quantity !== 0 && (
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -155,7 +191,7 @@ export default function ManualAdjustmentPage() {
                   >
                     New stock will be:{" "}
                     <span className="font-semibold text-gray-700">
-                      {Math.max(0, selectedProduct.stock + (movementType === "DAMAGED" ? -Math.abs(quantity) : quantity))}
+                      {Math.max(0, selectedVariant.stock + (movementType === "DAMAGED" ? -Math.abs(quantity) : quantity))}
                     </span>
                   </motion.p>
                 )}

@@ -37,46 +37,76 @@ model Category {
   @@map("categories")
 }
 
+// ─── Product (catalogue-level information, shared across all variants) ─────────
+
 model Product {
-  id                String              @id @default(cuid())
-  name              String
-  slug              String              @unique
-  description       String?             @db.Text
-  categoryId        String
-  category          Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  price             Decimal             @db.Decimal(10, 2)
-  discountedPrice   Decimal?            @db.Decimal(10, 2)
-  stock             Int                 @default(0)
-  imageUrls         String[]            @default([])
-  featured          Boolean             @default(false)
-  nutritionInfo     String?             @db.Text
-  ingredients       String?             @db.Text
-  benefits          String?             @db.Text
-  weight            String?
-  tags              String[]            @default([])
-  rating            Decimal             @default(0) @db.Decimal(3, 2)
-  reviewCount       Int                 @default(0)
-  // Cost & inventory fields
-  costPrice         Decimal?            @db.Decimal(10, 2)
-  averageCostPrice  Decimal?            @db.Decimal(10, 2)
-  lastPurchasePrice Decimal?            @db.Decimal(10, 2)
-  minimumStockLevel Int                 @default(0)
-  // ERP extensions
-  sku               String?             @unique
-  unit              String              @default("units")
-  defaultTaxRate    Decimal             @default(0) @db.Decimal(5, 2)
-  active            Boolean             @default(true)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  orderItems        OrderItem[]
+  id            String           @id @default(cuid())
+  name          String
+  slug          String           @unique
+  description   String?          @db.Text
+  categoryId    String
+  category      Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  imageUrls     String[]         @default([])
+  featured      Boolean          @default(false)
+  nutritionInfo String?          @db.Text
+  ingredients   String?          @db.Text
+  benefits      String?          @db.Text
+  tags          String[]         @default([])
+  rating        Decimal          @default(0) @db.Decimal(3, 2)
+  reviewCount   Int              @default(0)
+  // ERP extensions (product-level)
+  defaultTaxRate Decimal         @default(0) @db.Decimal(5, 2)
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  // Relations
+  variants           ProductVariant[]
+  orderItems         OrderItem[]
   purchaseOrderItems PurchaseOrderItem[]
   inventoryMovements InventoryMovement[]
-  invoiceItems      InvoiceItem[]
+  invoiceItems       InvoiceItem[]
 
   @@index([categoryId])
   @@index([slug])
   @@index([featured])
   @@map("products")
+}
+
+// ─── Product Variant (one sellable package — has price, stock, SKU, weight) ───
+
+model ProductVariant {
+  id            String      @id @default(cuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku           String?     @unique
+  variantName   String      // e.g. "500 ml", "1 L", "2 Bottles"
+  quantityValue Decimal     @db.Decimal(10, 3)  // e.g. 500, 1, 2
+  unit          ProductUnit @default(GRAM)
+  customUnit    String?     // filled when unit = CUSTOM, e.g. "Bottle"
+
+  sellingPrice  Decimal     @db.Decimal(10, 2)
+  costPrice     Decimal?    @db.Decimal(10, 2)
+  stock         Int         @default(0)
+  shippingWeight Decimal    @db.Decimal(10, 3)  // in kg, used for shipping calculation
+
+  barcode       String?
+  active        Boolean     @default(true)
+  isDefault     Boolean     @default(false)
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Back-references from transaction models
+  orderItems         OrderItem[]
+  invoiceItems       InvoiceItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variants")
 }
 
 model Order {
@@ -114,15 +144,27 @@ model Order {
 }
 
 model OrderItem {
-  id          String   @id @default(cuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String?
-  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productName String
-  quantity    Int
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  total       Decimal  @db.Decimal(10, 2)
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Live links (nullable so historical records survive product/variant deletion)
+  productId String?
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  // Immutable snapshots
+  productName             String
+  variantNameSnapshot     String?
+  quantityValueSnapshot   Decimal? @db.Decimal(10, 3)
+  unitSnapshot            String?
+  customUnitSnapshot      String?
+  skuSnapshot             String?
+
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
 
   @@index([orderId])
   @@map("order_items")
@@ -169,27 +211,37 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id          String   @id @default(cuid())
-  invoiceId   String
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  // Live links
+  productId String?
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
   productName String
   description String?
   quantity    Int
-  unitPrice   Decimal  @db.Decimal(10, 2)
-  taxRate     Decimal  @default(0) @db.Decimal(5, 2)
-  taxAmount   Decimal  @default(0) @db.Decimal(10, 2)
-  total       Decimal  @db.Decimal(10, 2)
-  // ERP Product Link & Snapshots
-  productId           String?
-  product             Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productNameSnapshot String?
-  skuSnapshot         String?
-  unitSnapshot        String?
-  unitPriceSnapshot   Decimal? @db.Decimal(10, 2)
-  taxRateSnapshot     Decimal? @default(0) @db.Decimal(5, 2)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  taxRate     Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+
+  // ERP Product & Variant Snapshots
+  productNameSnapshot   String?
+  variantNameSnapshot   String?
+  quantityValueSnapshot Decimal? @db.Decimal(10, 3)
+  unitSnapshot          String?
+  customUnitSnapshot    String?
+  skuSnapshot           String?
+  unitPriceSnapshot     Decimal? @db.Decimal(10, 2)
+  taxRateSnapshot       Decimal? @default(0) @db.Decimal(5, 2)
 
   @@index([invoiceId])
   @@index([productId])
+  @@index([variantId])
   @@map("invoice_items")
 }
 
@@ -243,51 +295,70 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id               String        @id @default(cuid())
-  purchaseOrderId  String
-  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  productId        String?
-  product          Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  // Live links
+  productId String?
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
   productName      String
   quantity         Int
-  receivedQuantity Int           @default(0)
-  unit             String        @default("units")
-  costPrice        Decimal       @db.Decimal(10, 2)
-  taxRate          Decimal       @default(0) @db.Decimal(5, 2)
-  taxAmount        Decimal       @default(0) @db.Decimal(10, 2)
-  total            Decimal       @db.Decimal(10, 2)
-  // ERP Product Snapshots
-  productNameSnapshot String?
-  skuSnapshot         String?
-  unitSnapshot        String?
-  costPriceSnapshot   Decimal?    @db.Decimal(10, 2)
-  taxRateSnapshot     Decimal?    @default(0) @db.Decimal(5, 2)
+  receivedQuantity Int     @default(0)
+  unit             String  @default("units")
+  costPrice        Decimal @db.Decimal(10, 2)
+  taxRate          Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount        Decimal @default(0) @db.Decimal(10, 2)
+  total            Decimal @db.Decimal(10, 2)
+
+  // ERP Snapshots
+  productNameSnapshot   String?
+  variantNameSnapshot   String?
+  skuSnapshot           String?
+  unitSnapshot          String?
+  costPriceSnapshot     Decimal? @db.Decimal(10, 2)
+  taxRateSnapshot       Decimal? @default(0) @db.Decimal(5, 2)
 
   @@index([purchaseOrderId])
   @@index([productId])
+  @@index([variantId])
   @@map("purchase_order_items")
 }
 
 model InventoryMovement {
-  id            String       @id @default(cuid())
+  id            String         @id @default(cuid())
   productId     String
-  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId     String?
+  variant       ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
   movementType  MovementType
   quantity      Int
   previousStock Int
   newStock      Int
-  referenceType String?      // "PURCHASE_ORDER" | "ORDER" | "MANUAL_ADJUSTMENT"
+  referenceType String?        // "PURCHASE_ORDER" | "ORDER" | "MANUAL_ADJUSTMENT"
   referenceId   String?
-  notes         String?      @db.Text
-  createdAt     DateTime     @default(now())
+  notes         String?        @db.Text
+  createdAt     DateTime       @default(now())
 
   @@index([productId])
+  @@index([variantId])
   @@index([movementType])
   @@index([createdAt])
   @@map("inventory_movements")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ProductUnit {
+  GRAM
+  KILOGRAM
+  MILLILITRE
+  LITRE
+  CUSTOM
+}
 
 enum InvoiceType {
   ECOMMERCE

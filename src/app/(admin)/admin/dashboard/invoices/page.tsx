@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface InvoiceLineItem {
   productId: string | null;
+  variantId: string | null;
   productName: string;
   description: string;
   quantity: number;
@@ -29,7 +30,7 @@ interface InvoiceLineItem {
 }
 
 const emptyItem = (): InvoiceLineItem => ({
-  productId: null, productName: "", description: "", quantity: 1, unitPrice: 0, taxRate: 0,
+  productId: null, variantId: null, productName: "", description: "", quantity: 1, unitPrice: 0, taxRate: 0,
 });
 
 export default function AdminInvoicesPage() {
@@ -122,6 +123,7 @@ export default function AdminInvoicesPage() {
   // When a product is selected in a row
   const handleSelectProduct = (index: number, product: any) => {
     updateItem(index, "productId", product.id);
+    updateItem(index, "variantId", product.variantId || null);
     updateItem(index, "productName", product.name);
     updateItem(index, "unitPrice", Number(product.price));
     updateItem(index, "taxRate", Number(product.defaultTaxRate || 0));
@@ -134,6 +136,7 @@ export default function AdminInvoicesPage() {
 
   const handleCreateProductInline = (index: number, name: string) => {
     updateItem(index, "productId", null);
+    updateItem(index, "variantId", null);
     updateItem(index, "productName", name);
     updateItem(index, "unitPrice", 0);
     updateItem(index, "taxRate", 0);
@@ -193,6 +196,7 @@ export default function AdminInvoicesPage() {
           notes,
           items: items.map((i) => ({
             productId: i.productId,
+            variantId: i.variantId,
             productName: i.productName,
             description: i.description || null,
             quantity: i.quantity,

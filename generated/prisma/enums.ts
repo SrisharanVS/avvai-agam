@@ -9,6 +9,17 @@
 * 🟢 You can import this file directly.
 */
 
+export const ProductUnit = {
+  GRAM: 'GRAM',
+  KILOGRAM: 'KILOGRAM',
+  MILLILITRE: 'MILLILITRE',
+  LITRE: 'LITRE',
+  CUSTOM: 'CUSTOM'
+} as const
+
+export type ProductUnit = (typeof ProductUnit)[keyof typeof ProductUnit]
+
+
 export const InvoiceType = {
   ECOMMERCE: 'ECOMMERCE',
   MANUAL: 'MANUAL'

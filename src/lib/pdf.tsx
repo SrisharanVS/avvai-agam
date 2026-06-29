@@ -224,7 +224,7 @@ export function InvoicePDF({ invoice }: { invoice: PDFInvoiceData }) {
             <Text style={styles.brandTagline}>Pure Food. Naturally Yours.</Text>
           </View>
           <View style={styles.companyDetails}>
-            <Text style={{ fontFamily: "Helvetica-Bold", color: "#1E293B" }}>Avvai Natural Foods</Text>
+            <Text style={{ fontFamily: "Helvetica-Bold", color: "#1E293B" }}>Avvai Iyarkai Agam</Text>
             <Text>12, Farm Direct Lane, Organic Hub</Text>
             <Text>Chennai, Tamil Nadu, 600001</Text>
             <Text>Email: support@avvai.in | Web: www.avvai.in</Text>
@@ -355,13 +355,13 @@ export function InvoicePDF({ invoice }: { invoice: PDFInvoiceData }) {
           <Text style={styles.notesTitle}>Terms & Conditions / Notes</Text>
           <Text style={styles.notesText}>
             {invoice.notes ||
-              "Thank you for shopping with Avvai Natural Foods! We promise farm-fresh purity in every pack. Goods once sold are not returnable under normal circumstances. For issues or query resolution, write to support@avvai.in."}
+              "Thank you for shopping with Avvai Iyarkai Agam! We promise farm-fresh purity in every pack. Goods once sold are not returnable under normal circumstances. For issues or query resolution, write to support@avvai.in."}
           </Text>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Avvai Natural Foods — Pure Food. Naturally Yours.</Text>
+          <Text style={styles.footerText}>Avvai Iyarkai Agam — Pure Food. Naturally Yours.</Text>
         </View>
       </Page>
     </Document>
@@ -445,10 +445,10 @@ export function PurchaseOrderPDF({ po }: { po: PDFPurchaseOrderData }) {
 
   const deliveryDate = po.expectedDeliveryDate
     ? new Date(po.expectedDeliveryDate).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    })
     : "TBD";
 
   return (
@@ -461,7 +461,7 @@ export function PurchaseOrderPDF({ po }: { po: PDFPurchaseOrderData }) {
             <Text style={styles.brandTagline}>Pure Food. Naturally Yours.</Text>
           </View>
           <View style={styles.companyDetails}>
-            <Text style={{ fontFamily: "Helvetica-Bold", color: "#1E293B" }}>Avvai Natural Foods</Text>
+            <Text style={{ fontFamily: "Helvetica-Bold", color: "#1E293B" }}>Avvai Iyarkai Agam</Text>
             <Text>12, Farm Direct Lane, Organic Hub</Text>
             <Text>Chennai, Tamil Nadu, 600001</Text>
             <Text>Email: support@avvai.in | Web: www.avvai.in</Text>
@@ -597,7 +597,7 @@ export function PurchaseOrderPDF({ po }: { po: PDFPurchaseOrderData }) {
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 40 }}>
           <View style={{ width: "45%" }}>
             <View style={{ borderTopWidth: 1, borderTopColor: "#CBD5E1", paddingTop: 6 }}>
-              <Text style={{ fontSize: 8, color: "#64748B" }}>Authorised Signatory — Avvai Natural Foods</Text>
+              <Text style={{ fontSize: 8, color: "#64748B" }}>Authorised Signatory — Avvai Iyarkai Agam</Text>
             </View>
           </View>
           <View style={{ width: "45%" }}>
@@ -609,7 +609,7 @@ export function PurchaseOrderPDF({ po }: { po: PDFPurchaseOrderData }) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Avvai Natural Foods — Pure Food. Naturally Yours.</Text>
+          <Text style={styles.footerText}>Avvai Iyarkai Agam — Pure Food. Naturally Yours.</Text>
         </View>
       </Page>
     </Document>

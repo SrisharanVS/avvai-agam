@@ -16,7 +16,7 @@ export default function Footer() {
               <span className="text-2xl font-display font-bold text-cream-100">Avvai</span>
             </Link>
             <p className="text-sm text-primary-200 leading-relaxed mb-5">
-              Pure, organic, chemical-free foods sourced directly from trusted farmers. 
+              Pure, organic, chemical-free foods sourced directly from trusted farmers.
               Bringing nature's best to your table.
             </p>
             <div className="flex items-center gap-3">
@@ -125,7 +125,7 @@ export default function Footer() {
       <div className="border-t border-primary-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-primary-300 text-sm text-center sm:text-left">
-            © {new Date().getFullYear()} Avvai Natural Foods. All rights reserved.
+            © {new Date().getFullYear()} Avvai Iyarkai Agam. All rights reserved.
           </p>
           <p className="text-primary-400 text-xs">
             Pure Food. Naturally Yours. 🌿

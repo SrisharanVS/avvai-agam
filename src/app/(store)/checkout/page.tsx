@@ -236,7 +236,7 @@ export default function CheckoutPage() {
           key,
           amount,
           currency,
-          name: "Avvai Natural Foods",
+          name: "Avvai Iyarkai Agam",
           description: "Pure Food. Naturally Yours.",
           order_id: razorpayOrderId,
           prefill: {

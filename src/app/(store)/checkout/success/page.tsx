@@ -81,7 +81,7 @@ function CheckoutSuccessContent() {
           <div className="flex items-center justify-center gap-2 mb-2">
             <Leaf className="w-5 h-5 text-primary-600" />
             <span className="text-primary-600 font-medium text-sm uppercase tracking-wide">
-              Avvai Natural Foods
+              Avvai Iyarkai Agam
             </span>
           </div>
 

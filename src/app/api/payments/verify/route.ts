@@ -314,7 +314,7 @@ export async function POST(request: NextRequest) {
           gatewayFee: Number(invoice.gatewayFee),
           totalAmount: Number(invoice.totalAmount),
           paymentMethod: "RAZORPAY",
-          notes: `Thank you for shopping with Avvai Natural Foods! Items weight: ${totalWeightKg.toFixed(2)} kg | Shipping charged for: ${billableWeight} kg`,
+          notes: `Thank you for shopping with Avvai Iyarkai Agam! Items weight: ${totalWeightKg.toFixed(2)} kg | Shipping charged for: ${billableWeight} kg`,
           createdAt: invoice.createdAt,
           items: invoice.items.map((i) => ({
             productName: i.productName,

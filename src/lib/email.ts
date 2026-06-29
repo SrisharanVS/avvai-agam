@@ -8,7 +8,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const FROM_EMAIL = `"Avvai Natural Foods" <${process.env.EMAIL_USER}>`;
+const FROM_EMAIL = `"Avvai Iyarkai Agam" <${process.env.EMAIL_USER}>`;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 export async function sendInvoiceEmail({
@@ -86,7 +86,7 @@ export async function sendInvoiceEmail({
         <!-- Footer -->
         <tr>
           <td style="background:#2D5016;padding:24px;text-align:center;">
-            <p style="color:#B8D4A0;margin:0;font-size:13px;">© 2024 Avvai Natural Foods. All rights reserved.</p>
+            <p style="color:#B8D4A0;margin:0;font-size:13px;">© 2024 Avvai Iyarkai Agam. All rights reserved.</p>
             <p style="color:#6B9E4A;margin:8px 0 0;font-size:12px;">Pure Food. Naturally Yours.</p>
           </td>
         </tr>
@@ -167,7 +167,7 @@ export async function sendOrderConfirmationEmail({
           <p style="color:#718096;font-size:14px;">We'll notify you when your order is shipped. Thank you for choosing Avvai!</p>
         </td></tr>
         <tr><td style="background:#2D5016;padding:24px;text-align:center;">
-          <p style="color:#B8D4A0;margin:0;font-size:13px;">© 2024 Avvai Natural Foods</p>
+          <p style="color:#B8D4A0;margin:0;font-size:13px;">© 2024 Avvai Iyarkai Agam</p>
         </td></tr>
       </table>
     </td></tr>
@@ -235,7 +235,7 @@ export async function sendPurchaseOrderEmail({
         </tr>
         <tr>
           <td style="background:#2D5016;padding:24px;text-align:center;">
-            <p style="color:#B8D4A0;margin:0;font-size:13px;">© 2024 Avvai Natural Foods. All rights reserved.</p>
+            <p style="color:#B8D4A0;margin:0;font-size:13px;">© 2024 Avvai Iyarkai Agam. All rights reserved.</p>
           </td>
         </tr>
       </table>
@@ -251,7 +251,7 @@ export async function sendPurchaseOrderEmail({
   return await transporter.sendMail({
     from: FROM_EMAIL,
     to,
-    subject: `Purchase Order ${poNumber} from Avvai Natural Foods`,
+    subject: `Purchase Order ${poNumber} from Avvai Iyarkai Agam`,
     html: emailHtml,
     attachments,
   });

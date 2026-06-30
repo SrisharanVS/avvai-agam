@@ -93,14 +93,17 @@ export default function Footer() {
               <div className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-primary-400 mt-0.5 flex-shrink-0" />
                 <p className="text-primary-200 text-sm">
-                  No. 12, Organic Market Street,<br />
-                  Chennai, Tamil Nadu 600001
+                  33, NSR Road, Saibaba Colony,<br />
+                  Coimbatore, Tamil Nadu - 641 011
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <Phone className="w-4 h-4 text-primary-400 flex-shrink-0" />
-                <a href="tel:+919876543210" className="text-primary-200 hover:text-cream-100 text-sm transition-colors">
-                  +91 98765 43210
+                <a href="tel:+919790656561" className="text-primary-200 hover:text-cream-100 text-sm transition-colors">
+                  +91 97906 56561
+                </a>
+                <a href="tel:+919842993000" className="text-primary-200 hover:text-cream-100 text-sm transition-colors">
+                  +91 98429 93000
                 </a>
               </div>
               <div className="flex items-center gap-3">

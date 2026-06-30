@@ -50,7 +50,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-32 h-16 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-32 h-16 flex items-center justify-center transition-transform">
                 {/* <Leaf className="w-4 h-4 text-cream-100" /> */}
                 <Image src="/avvai-ayya1-removebg-preview.png" alt="" width={1200} height={600} />
               </div>

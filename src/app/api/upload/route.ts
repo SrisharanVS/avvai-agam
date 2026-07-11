@@ -22,24 +22,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json(
-        { success: false, error: "File too large. Maximum 5MB." },
-        { status: 400 }
-      );
-    }
+    // // Validate size (5MB)
+    // if (file.size > 5 * 1024 * 1024) {
+    //   return NextResponse.json(
+    //     { success: false, error: "File too large. Maximum 5MB." },
+    //     { status: 400 }
+    //   );
+    // }
 
-    // Check if Vercel Blob is configured
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      // Fallback: return a placeholder URL for local dev
-      const placeholderUrl = `https://placehold.co/800x800/2D5016/F5F0E8?text=${encodeURIComponent(file.name.split(".")[0])}`;
-      return NextResponse.json({
-        success: true,
-        url: placeholderUrl,
-        message: "Using placeholder (configure BLOB_READ_WRITE_TOKEN for real uploads)",
-      });
-    }
+    // // Check if Vercel Blob is configured
+    // if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    //   // Fallback: return a placeholder URL for local dev
+    //   const placeholderUrl = `https://placehold.co/800x800/2D5016/F5F0E8?text=${encodeURIComponent(file.name.split(".")[0])}`;
+    //   return NextResponse.json({
+    //     success: true,
+    //     url: placeholderUrl,
+    //     message: "Using placeholder (configure BLOB_READ_WRITE_TOKEN for real uploads)",
+    //   });
+    // }
 
     const blob = await put(`/products/${file.name}`, file, { access: "public" });
     return NextResponse.json({ success: true, url: blob.url });

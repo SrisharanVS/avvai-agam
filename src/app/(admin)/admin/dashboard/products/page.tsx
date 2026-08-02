@@ -102,7 +102,7 @@ export default function AdminProductsPage() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/products?limit=100");
+      const res = await fetch("/api/products?limit=1200");
       const data = await res.json();
       if (data.success) setProducts(data.data || []);
     } catch {

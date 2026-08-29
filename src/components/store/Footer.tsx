@@ -64,7 +64,7 @@ export default function Footer() {
                 { label: "Millets", href: "/shop?category=millets", slug: "millets" },
                 { label: "Herbal Powder", href: "/shop?category=herbal-powder", slug: "herbal-powder" },
                 { label: "Spices", href: "/shop?category=spices", slug: "spices" },
-                { label: "Dry Fruits and Powder", href: "/shop?category=dry-fruits-and-powder", slug: "dry-fruits-and-powder" },
+                // { label: "Dry Fruits and Powder", href: "/shop?category=dry-fruits-and-powder", slug: "dry-fruits-and-powder" },
               ].map((link) => (
                 <li key={link.href}>
                   <Link
@@ -88,8 +88,6 @@ export default function Footer() {
                 { label: "Why Organic?", href: "/#why-us" },
                 { label: "Privacy Policy", href: "/privacy" },
                 { label: "Terms of Service", href: "/terms" },
-                { label: "Shipping Policy", href: "/shipping" },
-                { label: "Return Policy", href: "/returns" },
               ].map((link) => (
                 <li key={link.href}>
                   <Link
@@ -145,7 +143,7 @@ export default function Footer() {
       <div className="border-t border-primary-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-primary-300 text-sm text-center sm:text-left">
-            © {new Date().getFullYear()} Avvai Iyarkai Agam. All rights reserved.
+            © {new Date().getFullYear()} Avvai Organics. All rights reserved.
           </p>
           <p className="text-primary-400 text-xs">
             Pure Food. Naturally Yours. 🌿

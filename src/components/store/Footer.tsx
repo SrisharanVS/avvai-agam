@@ -1,7 +1,23 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Leaf, Phone, Mail, MapPin, Camera, Rss, Video, Clock } from "lucide-react";
 
 export default function Footer() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleCategoryClick = (e: React.MouseEvent<HTMLAnchorElement>, slug: string) => {
+    e.preventDefault();
+    if (pathname === "/shop") {
+      window.dispatchEvent(new CustomEvent("filter-category", { detail: slug }));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      router.push(slug ? `/shop?category=${slug}` : "/shop");
+    }
+  };
+
   return (
     <footer className="bg-primary-800 text-cream-200">
       {/* Main footer */}
@@ -42,17 +58,18 @@ export default function Footer() {
             <h3 className="text-cream-100 font-semibold text-sm uppercase tracking-wider mb-4">Shop</h3>
             <ul className="space-y-2.5">
               {[
-                { label: "All Products", href: "/shop" },
-                { label: "Organic Rice", href: "/shop?category=organic-rice" },
-                { label: "Cold Pressed Oils", href: "/shop?category=cold-pressed-oils" },
-                { label: "Millets", href: "/shop?category=millets" },
-                { label: "Herbal Products", href: "/shop?category=herbal-products" },
-                { label: "Spices", href: "/shop?category=spices" },
-                { label: "Dry Fruits", href: "/shop?category=dry-fruits" },
+                { label: "All Products", href: "/shop", slug: "" },
+                { label: "Traditional Rice", href: "/shop?category=rice", slug: "rice" },
+                { label: "Cold Pressed Oil", href: "/shop?category=cold-pressed-oil", slug: "cold-pressed-oil" },
+                { label: "Millets", href: "/shop?category=millets", slug: "millets" },
+                { label: "Herbal Powder", href: "/shop?category=herbal-powder", slug: "herbal-powder" },
+                { label: "Spices", href: "/shop?category=spices", slug: "spices" },
+                { label: "Dry Fruits and Powder", href: "/shop?category=dry-fruits-and-powder", slug: "dry-fruits-and-powder" },
               ].map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                    onClick={(e) => handleCategoryClick(e, link.slug)}
                     className="text-primary-200 hover:text-cream-100 text-sm transition-colors"
                   >
                     {link.label}

@@ -70,6 +70,28 @@ function ShopContent() {
       .then((d) => d.success && setCategories(d.data));
   }, []);
 
+  // Handle filter-category events dispatched from Footer or other components
+  useEffect(() => {
+    const handleFilterCategory = (e: CustomEvent<string>) => {
+      setSelectedCategory(e.detail || "");
+      setPage(1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    window.addEventListener("filter-category" as any, handleFilterCategory);
+    return () => window.removeEventListener("filter-category" as any, handleFilterCategory);
+  }, []);
+
+  // Sync category param if navigated with URL query params, then clear query string from browser bar
+  useEffect(() => {
+    const cat = searchParams.get("category");
+    if (cat) {
+      setSelectedCategory(cat);
+      setPage(1);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     const timer = setTimeout(fetchProducts, 300);
     return () => clearTimeout(timer);

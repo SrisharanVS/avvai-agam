@@ -56,7 +56,16 @@ export async function GET(request: NextRequest) {
     const where: any = { active: true };
 
     if (category) {
-      where.category = { slug: category };
+      const keywords = category.split("-").filter((k) => k.length > 2 && k !== "and");
+      where.category = {
+        OR: [
+          { slug: { equals: category, mode: "insensitive" } },
+          { slug: { contains: category, mode: "insensitive" } },
+          { name: { contains: category.replace(/-/g, " "), mode: "insensitive" } },
+          ...keywords.map((kw) => ({ slug: { contains: kw, mode: "insensitive" as const } })),
+          ...keywords.map((kw) => ({ name: { contains: kw, mode: "insensitive" as const } })),
+        ],
+      };
     }
 
     if (featured === "true") {
